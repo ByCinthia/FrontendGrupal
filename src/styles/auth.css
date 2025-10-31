@@ -1,0 +1,156 @@
+:root {
+  --bg: #0f172a;          /* slate-900 */
+  --panel: #0b1220;       /* slate-950 */
+  --muted: #94a3b8;       /* slate-400 */
+  --text: #e2e8f0;        /* slate-200 */
+  --accent1: #5b86e5;
+  --accent2: #36d1dc;
+  --ring: #93c5fd;
+}
+
+.auth-container {
+  min-height: 100dvh;               /* ocupa toda la altura visible */
+  display: flex;                    /* activa flexbox */
+  justify-content: center;          /* centra horizontalmente */
+  align-items: center;              /* centra verticalmente */
+  background: radial-gradient(
+    80% 120% at 50% 10%,
+    #0b1220 0%,
+    #1c2c50 60%,
+    #0a0f1f 100%
+  );
+  color: var(--text);
+  padding: 24px;
+  box-sizing: border-box;           /* asegura que padding no rompa el diseño */
+  width: 100%;                      /* ocupa todo el ancho */
+}
+
+.auth-box-modern {
+  width: min(1024px, 95vw); background: rgba(8, 14, 28, .7);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(148,163,184,.15);
+  border-radius: 20px; overflow: hidden;
+  display: grid; grid-template-columns: 1.1fr 1fr; min-height: 560px;
+  box-shadow: 0 10px 40px rgba(0,0,0,.45);
+}
+
+.auth-left {
+  position: relative; background: linear-gradient(135deg, var(--accent1), var(--accent2));
+}
+.auth-image { position:absolute; inset:0; background:
+  radial-gradient(35% 35% at 60% 20%, rgba(255,255,255,.25), transparent 60%),
+  url('https://iberent.com/web/app/uploads/2024/03/iStock-1456192121.webp') center/cover no-repeat;
+  mix-blend: overlay;
+}
+
+.auth-right { padding: 40px 36px; display: grid; place-items: center; }
+
+.auth-form-modern { 
+  width: 100%; 
+  display: grid; 
+  
+  max-width: 440px; }
+.auth-form-modern h2 { 
+  font-size: 28px;
+  display: flex;;
+  margin: 0 0 8px; }
+.auth-form-modern p { 
+  color: var(--muted); 
+  margin: 0 0 24px; }
+  
+  .register-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr 1fr;
+  margin-bottom: 10px;
+}
+
+
+.input-group {
+  position: relative; 
+  display: flex; grid-template-columns: 28px 1fr auto; gap: 8px;
+  align-items: center; background: #0b1324; border: 1px solid rgba(148,163,184,.16);
+  border-radius: 12px; padding: 10px 12px; margin-bottom: 14px;
+}
+.input-icon { opacity: .9; }
+.input-group input {
+  background: transparent; 
+  border: 0; outline: 
+  none; color: var(--text);
+  padding: 6px 2px; 
+  font-size: 15px;
+}
+.ghost-btn { background: transparent; border: 0; color: var(--muted); cursor: pointer; }
+
+.error { color: #fecaca; font-size: 12px; grid-column: 2 / -1; margin-top: -6px; }
+
+.forgot-password {
+  display: inline-block; margin: 2px 0 16px; color: var(--muted); font-size: 14px;
+}
+
+.auth-button-modern {
+  width: 100%; padding: 12px 16px; border-radius: 12px; border: 0; cursor: pointer;
+  background: linear-gradient(90deg, var(--accent1), var(--accent2));
+  color: white; font-weight: 700; letter-spacing: .2px;
+  box-shadow: 0 6px 16px rgba(54, 209, 220, .25);
+  transition: transform .12s ease, box-shadow .2s ease;
+}
+.auth-button-modern:disabled { 
+  opacity: .7; cursor: not-allowed;
+
+}
+.auth-button-modern:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+   transform: translateY(-1px); }
+
+.message { padding: 10px 12px; border-radius: 10px; margin-bottom: 14px; font-size: 14px; }
+.message.success { 
+  background: rgba(34,197,94,.15); border: 1px solid rgba(34,197,94,.3); }
+.message.error   { 
+  background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.3); }
+
+.register-grid {
+    margin-bottom: 10px;
+
+  grid-template-columns: 1fr 1fr;
+}
+
+@media (max-width: 900px) {
+  .register-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 900px) {
+  .auth-box-modern { grid-template-columns: 1fr; }
+  .auth-left { display: none; }
+}
+
+/* Estilos para tarjetas de planes */
+.plan-card {
+  transition: all 0.2s ease;
+  transform: translateY(0);
+}
+
+.plan-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.plan-card--selected {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.15);
+}
+
+/* Botón de enlace estilizado */
+.link-button {
+  background: none;
+  border: none;
+  color: #3b82f6;
+  cursor: pointer;
+  text-decoration: underline;
+  font-size: inherit;
+  padding: 0;
+}
+
+.link-button:hover {
+  color: #2563eb;
+}
