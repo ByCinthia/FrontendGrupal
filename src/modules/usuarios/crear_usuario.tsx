@@ -1,8 +1,10 @@
 // src/modules/usuarios/crear_usuario.tsx
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createUser } from "./service";
 import type { CreateUserPayload } from "./types";
+import { useAuth } from "../auth/service";
+import { http } from "../../shared/api/client";
 import "../../styles/dashboard.css";
 
 interface UserForm {
@@ -14,16 +16,28 @@ interface UserForm {
   password?: string;
   is_staff: boolean;
   is_active: boolean;
-  is_superuser: boolean;
-  // date_joined y last_login se manejan automáticamente en Django
-  
-  // Campos adicionales (opcionales para perfil extendido)
+  // Campos adicionales
   telefono?: string;
   cargo?: string;
   departamento?: string;
   fecha_ingreso?: string;
-  user_permissions?: string[];
+  grupo_id?: number | string;
+  permisos?: string[];
   avatar?: string;
+}
+
+interface Grupo {
+  id: number;
+  name: string;
+  description?: string;
+  empresa_id?: number;
+}
+
+interface Permiso {
+  id: string;
+  name: string;
+  description: string;
+  categoria: string;
 }
 
 const DEPARTAMENTOS = [
@@ -44,36 +58,107 @@ const CARGOS = [
   "Especialista"
 ];
 
+// Permisos predefinidos por categoría
+const PERMISOS_PREDEFINIDOS: Permiso[] = [
+  // Usuarios
+  { id: "user.read", name: "Ver usuarios", description: "Puede ver la lista de usuarios", categoria: "Usuarios" },
+  { id: "user.create", name: "Crear usuarios", description: "Puede crear nuevos usuarios", categoria: "Usuarios" },
+  { id: "user.edit", name: "Editar usuarios", description: "Puede modificar información de usuarios", categoria: "Usuarios" },
+  { id: "user.delete", name: "Eliminar usuarios", description: "Puede eliminar usuarios", categoria: "Usuarios" },
+  { id: "user.toggle", name: "Activar/Desactivar usuarios", description: "Puede cambiar el estado de usuarios", categoria: "Usuarios" },
+  
+  // Finanzas
+  { id: "finance.read", name: "Ver finanzas", description: "Puede ver información financiera", categoria: "Finanzas" },
+  { id: "finance.create", name: "Crear transacciones", description: "Puede crear nuevas transacciones", categoria: "Finanzas" },
+  { id: "finance.edit", name: "Editar finanzas", description: "Puede modificar información financiera", categoria: "Finanzas" },
+  { id: "finance.approve", name: "Aprobar transacciones", description: "Puede aprobar transacciones financieras", categoria: "Finanzas" },
+  
+  // Reportes
+  { id: "reports.read", name: "Ver reportes", description: "Puede ver reportes del sistema", categoria: "Reportes" },
+  { id: "reports.export", name: "Exportar reportes", description: "Puede exportar reportes", categoria: "Reportes" },
+  { id: "reports.create", name: "Crear reportes", description: "Puede crear reportes personalizados", categoria: "Reportes" },
+  
+  // Configuración
+  { id: "config.read", name: "Ver configuración", description: "Puede ver configuración del sistema", categoria: "Configuración" },
+  { id: "config.edit", name: "Editar configuración", description: "Puede modificar configuración", categoria: "Configuración" },
+  { id: "personalization.edit", name: "Personalizar sistema", description: "Puede cambiar temas, logos, etc.", categoria: "Configuración" },
+];
+
 const CrearUsuarioPage: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [grupos, setGrupos] = useState<Grupo[]>([]);
+  const [loadingGrupos, setLoadingGrupos] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" | "" }>({
     text: "",
     type: "",
   });
 
   const [form, setForm] = useState<UserForm>({
-    // Campos obligatorios Django auth_user
     username: "",
     first_name: "",
     last_name: "",
     email: "",
-    password: "", // Opcional
+    password: "",
     is_staff: false,
-    is_active: true, // Por defecto activo
-    is_superuser: false,
-    
-    // Campos adicionales opcionales
+    is_active: true,
     telefono: "",
     cargo: "",
     departamento: "",
     fecha_ingreso: new Date().toISOString().split('T')[0],
-    user_permissions: [],
+    grupo_id: undefined, // <- cambiar de "" a undefined para evitar union string
+    permisos: [],
     avatar: "",
   });
 
   const [avatarPreview, setAvatarPreview] = useState<string>("");
+
+  // Verificar permisos al cargar
+  useEffect(() => {
+    const isAdmin = user?.roles?.includes("admin");
+    const isSuperAdmin = user?.roles?.includes("superadmin");
+    
+    if (!isAdmin && !isSuperAdmin) {
+      navigate("/app");
+      return;
+    }
+
+    // Solo los administradores de empresa pueden crear usuarios (no superadmin en este módulo)
+    if (!user?.empresa_id && !isSuperAdmin) {
+      navigate("/app");
+      return;
+    }
+
+    loadGrupos();
+  }, [user, navigate]);
+
+  const loadGrupos = async () => {
+    setLoadingGrupos(true);
+    try {
+      // Cargar grupos de la empresa del usuario actual
+      const response = await http.get<Grupo[]>("/api/User/group/", {
+        params: { empresa_id: user?.empresa_id }
+      });
+      setGrupos(response.data || []);
+    } catch (error) {
+      console.warn("Error cargando grupos, usando localStorage:", error);
+      
+      // Fallback: cargar desde localStorage
+      const stored = localStorage.getItem("mock.groups");
+      const localGrupos: Grupo[] = stored ? JSON.parse(stored) : [];
+      
+      // Filtrar grupos por empresa si es necesario
+      const gruposFiltrados = user?.empresa_id 
+        ? localGrupos.filter(g => g.empresa_id === user.empresa_id || !g.empresa_id)
+        : localGrupos;
+      
+      setGrupos(gruposFiltrados);
+    } finally {
+      setLoadingGrupos(false);
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -94,6 +179,15 @@ const CrearUsuarioPage: React.FC = () => {
     }
   };
 
+  const handlePermisoChange = (permisoId: string, checked: boolean) => {
+    setForm(prev => ({
+      ...prev,
+      permisos: checked 
+        ? [...(prev.permisos || []), permisoId]
+        : (prev.permisos || []).filter(p => p !== permisoId)
+    }));
+  };
+
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -110,10 +204,11 @@ const CrearUsuarioPage: React.FC = () => {
   const validateStep = (step: number): boolean => {
     switch (step) {
       case 1:
-        // Campos obligatorios de Django auth_user
         return !!(form.username && form.first_name && form.last_name && form.email);
       case 2:
         return true; // Campos adicionales son opcionales
+      case 3:
+        return true; // Permisos son opcionales
       default:
         return true;
     }
@@ -121,7 +216,7 @@ const CrearUsuarioPage: React.FC = () => {
 
   const nextStep = () => {
     if (validateStep(currentStep)) {
-      setCurrentStep(prev => Math.min(prev + 1, 2));
+      setCurrentStep(prev => Math.min(prev + 1, 3));
     } else {
       setMessage({ text: "Por favor complete todos los campos obligatorios", type: "error" });
       setTimeout(() => setMessage({ text: "", type: "" }), 3000);
@@ -143,28 +238,39 @@ const CrearUsuarioPage: React.FC = () => {
     setLoading(true);
 
     try {
-      // Preparar payload con estructura exacta de Django auth_user
+      // normalizar grupo_id y empresa_id a number | undefined
+      const grupoId: number | undefined =
+        form.grupo_id === undefined || form.grupo_id === null || form.grupo_id === ""
+          ? undefined
+          : Number(form.grupo_id);
+
+      const empresaId: number | undefined =
+        user?.empresa_id === undefined || user?.empresa_id === null || user?.empresa_id === ""
+          ? undefined
+          : Number(user?.empresa_id);
+
       const userData: CreateUserPayload = {
-        // Campos obligatorios auth_user
         username: form.username.trim(),
         first_name: form.first_name.trim(),
         last_name: form.last_name.trim(),
         email: form.email.trim(),
         is_staff: form.is_staff,
         is_active: form.is_active,
-        is_superuser: form.is_superuser,
-        password: form.password?.trim() || undefined, // Si está vacío, el backend genera una
-        
-        // Campos adicionales opcionales
+        is_superuser: false,
+        password: form.password?.trim() || undefined,
+
         telefono: form.telefono?.trim(),
         cargo: form.cargo,
         departamento: form.departamento,
         fecha_ingreso: form.fecha_ingreso,
-        user_permissions: form.user_permissions || [],
+        user_permissions: form.permisos || [],
         avatar: form.avatar,
+
+        grupo_id: grupoId,
+        empresa_id: empresaId,
       };
 
-      console.log("🚀 Creando usuario con datos:", userData);
+      console.log("🚀 Creando usuario para empresa:", empresaId, userData);
 
       const newUser = await createUser(userData);
       
@@ -174,16 +280,17 @@ const CrearUsuarioPage: React.FC = () => {
       const logEntry = {
         id: Date.now().toString(),
         action: "user_created",
-        user: JSON.parse(localStorage.getItem("auth.me") || "{}").email || "usuario",
+        user: user?.email || "administrador",
         timestamp: new Date().toISOString(),
-        details: `Usuario creado: ${newUser.first_name} ${newUser.last_name} (${newUser.email})`
+        details: `Usuario creado: ${newUser.first_name} ${newUser.last_name} (${newUser.email}) para empresa ${user?.empresa_nombre || user?.empresa_id}`,
+        empresa_id: user?.empresa_id
       };
       
       const existingLogs = JSON.parse(localStorage.getItem("audit_logs") || "[]");
       localStorage.setItem("audit_logs", JSON.stringify([logEntry, ...existingLogs]));
 
       setMessage({ 
-        text: `Usuario "${newUser.first_name} ${newUser.last_name}" creado exitosamente${newUser.message ? ` (${newUser.message})` : ""}`, 
+        text: `Usuario "${newUser.first_name} ${newUser.last_name}" creado exitosamente para ${user?.empresa_nombre || 'su empresa'}`, 
         type: "success" 
       });
       
@@ -202,12 +309,21 @@ const CrearUsuarioPage: React.FC = () => {
     }
   };
 
+  // Agrupar permisos por categoría
+  const permisosPorCategoria = PERMISOS_PREDEFINIDOS.reduce((acc, permiso) => {
+    if (!acc[permiso.categoria]) {
+      acc[permiso.categoria] = [];
+    }
+    acc[permiso.categoria].push(permiso);
+    return acc;
+  }, {} as Record<string, Permiso[]>);
+
   return (
     <section className="page">
       <div className="ui-page__header">
-        <h1 className="ui-title">👤 Crear Nuevo Usuario</h1>
+        <h1 className="ui-title">👤 Crear Usuario - {user?.empresa_nombre}</h1>
         <p className="ui-page__description">
-          Complete la información del nuevo usuario 
+          Complete la información del nuevo usuario para su empresa
         </p>
       </div>
       
@@ -219,7 +335,7 @@ const CrearUsuarioPage: React.FC = () => {
         marginBottom: "32px",
         gap: "24px"
       }}>
-        {[1, 2].map((step) => (
+        {[1, 2, 3].map((step) => (
           <div key={step} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <div style={{
               width: "40px",
@@ -240,10 +356,11 @@ const CrearUsuarioPage: React.FC = () => {
               color: step <= currentStep ? "#3b82f6" : "#6b7280",
               fontWeight: step === currentStep ? "bold" : "normal"
             }}>
-              {step === 1 && "Información Básica (auth_user)"}
+              {step === 1 && "Información Básica"}
               {step === 2 && "Información Adicional"}
+              {step === 3 && "Roles y Permisos"}
             </span>
-            {step < 2 && (
+            {step < 3 && (
               <div style={{
                 width: "60px",
                 height: "2px",
@@ -264,20 +381,20 @@ const CrearUsuarioPage: React.FC = () => {
       <form onSubmit={handleSubmit} className="ui-form">
         <div className="card card--data" style={{ maxWidth: "800px", margin: "0 auto", padding: "24px" }}>
           
-          {/* Paso 1: Campos de Django auth_user */}
+          {/* Paso 1: Información Básica */}
           {currentStep === 1 && (
             <div className="ui-form__section">
               <h3 className="ui-form__section-title">
-                🏗️ Campos  (Obligatorios)
+                🏗️ Información Básica
               </h3>
               
               <div className="ui-alert ui-alert--info">
-                📋 Estos campos corresponden exactamente a la tabla auth_user 
+                📋 El usuario será creado para la empresa: <strong>{user?.empresa_nombre}</strong>
               </div>
 
               <div className="ui-form__row">
                 <div className="ui-form__field">
-                  <label className="ui-label">Username * (username)</label>
+                  <label className="ui-label">Username *</label>
                   <input
                     className="ui-input"
                     type="text"
@@ -291,7 +408,7 @@ const CrearUsuarioPage: React.FC = () => {
                 </div>
 
                 <div className="ui-form__field">
-                  <label className="ui-label">Email * (email)</label>
+                  <label className="ui-label">Email *</label>
                   <input
                     className="ui-input"
                     type="email"
@@ -306,7 +423,7 @@ const CrearUsuarioPage: React.FC = () => {
 
               <div className="ui-form__row">
                 <div className="ui-form__field">
-                  <label className="ui-label">Nombre * (first_name)</label>
+                  <label className="ui-label">Nombre *</label>
                   <input
                     className="ui-input"
                     type="text"
@@ -319,7 +436,7 @@ const CrearUsuarioPage: React.FC = () => {
                 </div>
 
                 <div className="ui-form__field">
-                  <label className="ui-label">Apellido * (last_name)</label>
+                  <label className="ui-label">Apellido *</label>
                   <input
                     className="ui-input"
                     type="text"
@@ -334,7 +451,7 @@ const CrearUsuarioPage: React.FC = () => {
 
               <div className="ui-form__row">
                 <div className="ui-form__field">
-                  <label className="ui-label">Contraseña (password)</label>
+                  <label className="ui-label">Contraseña</label>
                   <input
                     className="ui-input"
                     type="password"
@@ -343,11 +460,11 @@ const CrearUsuarioPage: React.FC = () => {
                     onChange={handleChange}
                     placeholder="Dejar vacío para generar automáticamente"
                   />
-                  <small className="ui-meta"> </small>
+                  <small className="ui-meta">Se enviará por email al usuario</small>
                 </div>
 
                 <div className="ui-form__field">
-                  <label className="ui-label">Estado de la cuenta</label>
+                  <label className="ui-label">Estado</label>
                   <div style={{ display: "flex", flexDirection: "column", gap: "12px", paddingTop: "8px" }}>
                     <label className="ui-checkbox">
                       <input
@@ -356,7 +473,7 @@ const CrearUsuarioPage: React.FC = () => {
                         checked={form.is_active}
                         onChange={handleChange}
                       />
-                      <span className="ui-badge ui-badge--success">✅ Usuario activo (is_active)</span>
+                      <span className="ui-badge ui-badge--success">✅ Usuario activo</span>
                     </label>
 
                     <label className="ui-checkbox">
@@ -366,43 +483,20 @@ const CrearUsuarioPage: React.FC = () => {
                         checked={form.is_staff}
                         onChange={handleChange}
                       />
-                      <span className="ui-badge ui-badge--info">👤 Es staff - puede acceder al admin (is_staff)</span>
-                    </label>
-
-                    <label className="ui-checkbox">
-                      <input
-                        type="checkbox"
-                        name="is_superuser"
-                        checked={form.is_superuser}
-                        onChange={handleChange}
-                      />
-                      <span className="ui-badge ui-badge--warning">👑 Es superusuario - todos los permisos (is_superuser)</span>
+                      <span className="ui-badge ui-badge--info">👤 Puede acceder al panel de administración</span>
                     </label>
                   </div>
                 </div>
               </div>
-
-              <div className="ui-alert ui-alert--warning">
-                <h4 style={{ margin: "0 0 8px 0" }}>ℹ️ Información importante:</h4>
-                <ul style={{ margin: 0, paddingLeft: "20px", fontSize: "14px" }}>
-                  <li><strong>date_joined:</strong> Se establece automáticamente al crear el usuario</li>
-                  <li><strong>last_login:</strong> Se actualiza automáticamente en el primer login</li>
-                  <li><strong>id:</strong> Se genera automáticamente (auto-increment)</li>
-                </ul>
-              </div>
             </div>
           )}
 
-          {/* Paso 2: Campos adicionales */}
+          {/* Paso 2: Información Adicional */}
           {currentStep === 2 && (
             <div className="ui-form__section">
               <h3 className="ui-form__section-title">
-                📝 Información Adicional (Opcional)
+                📝 Información Adicional
               </h3>
-              
-              <div className="ui-alert ui-alert--success">
-                🔧 Estos campos pueden manejarse en un modelo extendido o perfil de usuario
-              </div>
 
               {/* Avatar */}
               <div style={{ textAlign: "center", marginBottom: "24px" }}>
@@ -495,6 +589,93 @@ const CrearUsuarioPage: React.FC = () => {
             </div>
           )}
 
+          {/* Paso 3: Roles y Permisos */}
+          {currentStep === 3 && (
+            <div className="ui-form__section">
+              <h3 className="ui-form__section-title">
+                🔐 Roles y Permisos
+              </h3>
+
+              {/* Grupo/Rol */}
+              <div className="ui-form__field" style={{ marginBottom: "24px" }}>
+                <label className="ui-label">Grupo/Rol</label>
+                <select
+                  className="ui-select"
+                  name="grupo_id"
+                  value={form.grupo_id || ""}
+                  onChange={handleChange}
+                  disabled={loadingGrupos}
+                >
+                  <option value="">Sin grupo asignado</option>
+                  {grupos.map(grupo => (
+                    <option key={grupo.id} value={grupo.id}>
+                      {grupo.name} {grupo.description && `- ${grupo.description}`}
+                    </option>
+                  ))}
+                </select>
+                {loadingGrupos && <small className="ui-meta">Cargando grupos...</small>}
+                <div style={{ marginTop: "8px" }}>
+                  <button 
+                    type="button" 
+                    className="ui-btn ui-btn--ghost"
+                    onClick={() => navigate("/app/crear-grupo")}
+                  >
+                    ➕ Crear nuevo grupo
+                  </button>
+                </div>
+              </div>
+
+              {/* Permisos Individuales */}
+              <div>
+                <h4 style={{ marginBottom: "16px", color: "#e6eef8" }}>Permisos Específicos</h4>
+                <div className="ui-alert ui-alert--info" style={{ marginBottom: "16px" }}>
+                  💡 Seleccione los permisos específicos que tendrá este usuario. Los permisos del grupo se aplicarán automáticamente.
+                </div>
+                
+                {Object.entries(permisosPorCategoria).map(([categoria, permisos]) => (
+                  <div key={categoria} style={{ marginBottom: "24px" }}>
+                    <h5 style={{ 
+                      marginBottom: "12px", 
+                      color: "#3b82f6",
+                      fontSize: "14px",
+                      fontWeight: "600",
+                      borderBottom: "1px solid rgba(148,163,184,.16)",
+                      paddingBottom: "4px"
+                    }}>
+                      {categoria}
+                    </h5>
+                    <div style={{ 
+                      display: "grid", 
+                      gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", 
+                      gap: "8px" 
+                    }}>
+                      {permisos.map(permiso => (
+                        <label key={permiso.id} className="ui-checkbox" style={{ 
+                          padding: "8px", 
+                          background: "rgba(255,255,255,0.02)",
+                          borderRadius: "6px",
+                          border: "1px solid rgba(148,163,184,.08)"
+                        }}>
+                          <input
+                            type="checkbox"
+                            checked={form.permisos?.includes(permiso.id) || false}
+                            onChange={(e) => handlePermisoChange(permiso.id, e.target.checked)}
+                          />
+                          <div>
+                            <span style={{ fontWeight: "500", color: "#e6eef8" }}>{permiso.name}</span>
+                            <small style={{ display: "block", color: "#94a3b8", fontSize: "12px" }}>
+                              {permiso.description}
+                            </small>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Navigation Buttons */}
           <div className="ui-form__actions">
             {currentStep > 1 && (
@@ -515,7 +696,7 @@ const CrearUsuarioPage: React.FC = () => {
               Cancelar
             </button>
             
-            {currentStep < 2 ? (
+            {currentStep < 3 ? (
               <button 
                 type="button" 
                 onClick={nextStep}

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../../modules/auth/service";
 import { getMenuForUser } from "./menuData";
+import "./sidebar.css";
 
 export type SidebarProps = {
   brand?: string;
@@ -14,7 +15,7 @@ const LOGO_STORAGE_KEY = "ui.company.logo";
 
 const Sidebar: React.FC<SidebarProps> = ({ brand = "Mi Empresa", collapseOnNavigate = false }) => {
   const { user, logout } = useAuth();
-  
+
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try {
       return localStorage.getItem(STORAGE_KEY) === "1";
@@ -23,6 +24,7 @@ const Sidebar: React.FC<SidebarProps> = ({ brand = "Mi Empresa", collapseOnNavig
     }
   });
 
+  // companyLogo ahora se usa para mostrar el logo en el header del sidebar
   const [companyLogo] = useState<string>(() => {
     try {
       return localStorage.getItem(LOGO_STORAGE_KEY) || "";
@@ -39,13 +41,11 @@ const Sidebar: React.FC<SidebarProps> = ({ brand = "Mi Empresa", collapseOnNavig
     }
   }, [collapsed]);
 
-  const toggle = useCallback(() => setCollapsed(c => !c), []);
+  const toggle = useCallback(() => setCollapsed((c) => !c), []);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // tecla '=' para alternar (sin importar si está con shift)
       if (e.key === "=") {
-        // evitar cuando se está escribiendo en inputs/textareas
         const active = document.activeElement;
         if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || (active as HTMLElement).isContentEditable)) {
           return;
@@ -56,7 +56,6 @@ const Sidebar: React.FC<SidebarProps> = ({ brand = "Mi Empresa", collapseOnNavig
     };
     window.addEventListener("keydown", handler);
 
-    // escuchar evento global para que Topbar pueda alternar el sidebar
     const evHandler = () => toggle();
     window.addEventListener("app:toggle-sidebar", evHandler as EventListener);
 
@@ -66,22 +65,10 @@ const Sidebar: React.FC<SidebarProps> = ({ brand = "Mi Empresa", collapseOnNavig
     };
   }, [toggle]);
 
-  // Obtener información del usuario
-  const getUserDisplay = () => {
-    if (user?.nombre_completo?.trim()) return user.nombre_completo;
-    if (user?.username?.trim()) return user.username;
-    if (user?.email?.includes("@")) return user.email.split("@")[0];
-    return "Usuario";
-  };
-
   const getUserRole = () => {
     if (user?.roles?.includes("superadmin")) return "Super Admin";
     if (user?.roles?.includes("admin")) return "Administrador";
     return "Usuario";
-  };
-
-  const getCompanyName = () => {
-    return user?.empresa_nombre || brand;
   };
 
   const handleLogout = async () => {
@@ -90,34 +77,60 @@ const Sidebar: React.FC<SidebarProps> = ({ brand = "Mi Empresa", collapseOnNavig
     }
   };
 
-  // Obtener menú dinámico basado en el usuario
-  const menuItems = getMenuForUser(user);
+  // acceder de forma segura a propiedades que no están en AuthUser typings
+  const avatarUrl =
+    ((user as unknown) as Record<string, unknown>)["imagen_url_perfil"] ??
+    ((user as unknown) as Record<string, unknown>)["imagen_url"] ??
+    undefined;
+
+  const menuItems = getMenuForUser(user ?? null);
+
+  // Nombre de empresa: preferir valor de sesión, si no usar prop 'brand'
+  const companyName = user?.empresa_nombre || brand;
 
   return (
     <aside className={`sidebar ${collapsed ? "sidebar--collapsed" : ""}`} aria-hidden={collapsed}>
-      {/* Header del Sidebar con info de la empresa */}
-      <div className="sidebar__header">
-        <div className="brand">
-          {companyLogo ? (
-            <img 
-              src={companyLogo} 
-              alt="Logo de la empresa" 
-              className="brand__logo"
-            />
-          ) : (
-            <div className="brand__logo brand__logo--placeholder">
-              {getCompanyName().charAt(0).toUpperCase()}
-            </div>
-          )}
+      {/* PERFIL en la parte superior - Solo avatar y rol */}
+      <div className="sidebar__profile">
+        <div className="user-profile">
+          <div className="user-profile__avatar">
+            {typeof avatarUrl === "string" && avatarUrl ? (
+              <img src={avatarUrl as string} alt="Avatar" className="user-profile__image--large" />
+            ) : user?.email ? (
+              <img
+                src={`https://ui-avatars.com/api/?name=${encodeURIComponent(user?.nombre_completo ?? user?.username ?? "Usuario")}&background=667eea&color=fff&size=96`}
+                alt="Avatar"
+                className="user-profile__image--large"
+              />
+            ) : (
+              <div className="user-profile__placeholder--large">👤</div>
+            )}
+          </div>
+
           {!collapsed && (
-            <div className="brand__info">
-              <span className="brand__name">{getCompanyName()}</span>
-              <span className="brand__subtitle">
-                {user?.roles?.includes("superadmin") ? "Plataforma Global" : "Sistema de Gestión"}
-              </span>
+            <div className="user-profile__info">
+              <span className="user-profile__role">{getUserRole()}</span>
             </div>
           )}
         </div>
+      </div>
+
+      {/* Header del Sidebar - muestra logo (si existe) y toggle */}
+      <div className="sidebar__header">
+        <div className="brand">
+          {companyLogo ? (
+            <img src={companyLogo} alt={`${companyName} logo`} className="brand__logo" />
+          ) : (
+            <div className="brand__logo brand__logo--placeholder">{companyName.charAt(0).toUpperCase()}</div>
+          )}
+          {!collapsed && (
+            <div className="brand__info">
+              <span className="brand__name">{companyName}</span>
+              <span className="brand__subtitle">{user?.roles?.includes("superadmin") ? "Plataforma Global" : "Sistema"}</span>
+            </div>
+          )}
+        </div>
+
         <button
           type="button"
           className="sidebar__toggle"
@@ -127,48 +140,16 @@ const Sidebar: React.FC<SidebarProps> = ({ brand = "Mi Empresa", collapseOnNavig
           aria-label={collapsed ? "Abrir menú" : "Cerrar menú"}
         >
           <svg width="18" height="14" viewBox="0 0 18 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect y="0" width="18" height="2" rx="1" fill="currentColor"></rect>
-            <rect y="6" width="18" height="2" rx="1" fill="currentColor"></rect>
-            <rect y="12" width="18" height="2" rx="1" fill="currentColor"></rect>
+            <rect y="0" width="18" height="2" rx="1" fill="currentColor" />
+            <rect y="6" width="18" height="2" rx="1" fill="currentColor" />
+            <rect y="12" width="18" height="2" rx="1" fill="currentColor" />
           </svg>
         </button>
-      </div>
-
-      {/* Información del Usuario */}
-      <div className="sidebar__user">
-        <div className="user-profile">
-          <div className="user-profile__avatar">
-            {user?.email ? (
-              <img 
-                src={`https://ui-avatars.com/api/?name=${encodeURIComponent(getUserDisplay())}&background=667eea&color=fff&size=48`}
-                alt={getUserDisplay()}
-                className="user-profile__image"
-              />
-            ) : (
-              <div className="user-profile__placeholder">
-                👤
-              </div>
-            )}
-          </div>
-          {!collapsed && (
-            <div className="user-profile__info">
-              <span className="user-profile__name">{getUserDisplay()}</span>
-              <span className="user-profile__role">{getUserRole()}</span>
-              {user?.email && (
-                <span className="user-profile__email">{user.email}</span>
-              )}
-              {user?.empresa_nombre && !user?.roles?.includes("superadmin") && (
-                <span className="user-profile__company">{user.empresa_nombre}</span>
-              )}
-            </div>
-          )}
-        </div>
       </div>
 
       {/* Navegación Principal - MENÚ DINÁMICO */}
       <nav className="nav" aria-label="Navegación principal">
         {menuItems.map((item) => {
-          // Asegurar que las rutas del menú se resuelvan dentro de /app
           const to = item.path === "/" ? "/app" : item.path.startsWith("/app") ? item.path : `/app${item.path}`;
           return (
             <NavLink
@@ -188,13 +169,8 @@ const Sidebar: React.FC<SidebarProps> = ({ brand = "Mi Empresa", collapseOnNavig
         })}
       </nav>
 
-      {/* Footer del Sidebar con botón de logout */}
       <div className="sidebar__footer">
-        <button
-          onClick={handleLogout}
-          className="logout-btn"
-          title="Cerrar Sesión"
-        >
+        <button onClick={handleLogout} className="logout-btn" title="Cerrar Sesión">
           <span className="logout-btn__icon">🚪</span>
           {!collapsed && <span className="logout-btn__text">Cerrar Sesión</span>}
         </button>

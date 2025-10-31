@@ -89,6 +89,7 @@ export type UserDTO = {
   global_roles?: GlobalRole[];
   org_roles?: OrgRolesMap;
   tenant_id?: string | number | null;
+  permissions?: string[];
 };
 
 export type LoginDTO = {

@@ -1,5 +1,5 @@
 // src/modules/ingresos/dashboard.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import "../../styles/dashboard.css";
 
 interface IngresoData {
@@ -25,16 +25,13 @@ const DashboardIngresos: React.FC = () => {
   const [metricas, setMetricas] = useState<MetricaIngreso[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    cargarDatos();
-  }, [periodo]);
-
-  const cargarDatos = async () => {
+  // convertir cargarDatos en useCallback para ser declarado como dependencia
+  const cargarDatos = useCallback(async () => {
     setLoading(true);
-    
+
     // Simular carga de datos
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
     // Datos de ejemplo para el dashboard
     const ingresosEjemplo: IngresoData[] = [
       {
@@ -97,7 +94,12 @@ const DashboardIngresos: React.FC = () => {
     setIngresos(ingresosEjemplo);
     calcularMetricas(ingresosEjemplo);
     setLoading(false);
-  };
+  }, [/* si usaras 'periodo' dentro, añadir periodo aquí */]);
+
+  // llamar cargarDatos cuando cambie periodo
+  useEffect(() => {
+    void cargarDatos();
+  }, [cargarDatos, periodo]); // incluir periodo si cargarDatos depende de él
 
   const calcularMetricas = (data: IngresoData[]) => {
     const confirmados = data.filter(i => i.estado === "confirmado");
@@ -239,11 +241,13 @@ const DashboardIngresos: React.FC = () => {
             Monitoreo financiero en tiempo real - {getPeriodoTexto(periodo)}
           </p>
         </div>
-        
+
         <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-          <select 
-            value={periodo} 
-            onChange={(e) => setPeriodo(e.target.value as any)}
+          <select
+            value={periodo}
+            onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+              setPeriodo(e.target.value as "dia" | "semana" | "mes" | "ano")
+            }
             style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db" }}
           >
             <option value="dia">Hoy</option>
@@ -251,11 +255,8 @@ const DashboardIngresos: React.FC = () => {
             <option value="mes">Este Mes</option>
             <option value="ano">Este Año</option>
           </select>
-          
-          <button 
-            onClick={cargarDatos}
-            className="ui-btn ui-btn--ghost"
-          >
+
+          <button onClick={() => void cargarDatos()} className="ui-btn ui-btn--ghost">
             🔄 Actualizar
           </button>
         </div>

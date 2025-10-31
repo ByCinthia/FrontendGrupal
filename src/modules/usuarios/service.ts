@@ -9,7 +9,6 @@ import {
   type BackendPage,
   type CreateUserPayload,
   type CreateUserResponse,
-  type DjangoUserPayload,
 } from "./types";
 
 const normalizePage = <T,>(
@@ -29,149 +28,129 @@ const normalizePage = <T,>(
 
 // Función para crear usuario (adaptada a la estructura Django auth_user)
 export async function createUser(userData: CreateUserPayload): Promise<CreateUserResponse> {
-  // Tipado para errores tipo Axios sin usar `any`
-  interface HttpError {
-    response?: { status?: number; statusText?: string; data?: unknown };
-    message?: string;
-  }
+  console.log("🚀 Creando usuario:", userData);
+  
+  try {
+    // Preparar payload para el backend (sin 'grupo_id', usando 'groups' en su lugar)
+    const finalPayload: Omit<CreateUserPayload, "grupo_id"> & { groups?: number[] } = {
+      username: userData.username,
+      first_name: userData.first_name,
+      last_name: userData.last_name,
+      email: userData.email,
+      password: userData.password,
+      is_staff: userData.is_staff,
+      is_active: userData.is_active,
+      is_superuser: userData.is_superuser,
+      telefono: userData.telefono,
+      cargo: userData.cargo,
+      departamento: userData.departamento,
+      fecha_ingreso: userData.fecha_ingreso,
+      avatar: userData.avatar,
+      user_permissions: userData.user_permissions || [],
+      empresa_id: userData.empresa_id,
+      groups: userData.grupo_id ? [Number(userData.grupo_id)] : undefined,
+    };
 
-  const djangoPayload: DjangoUserPayload = {
-    username: userData.username,
-    first_name: userData.first_name,
-    last_name: userData.last_name,
-    email: userData.email,
-    is_staff: userData.is_staff,
-    is_active: userData.is_active,
-    is_superuser: userData.is_superuser || false,
-    password: userData.password || undefined,
-  };
+    console.log("📤 Payload enviado:", finalPayload);
 
-  console.log("[users.service] Payload para crear usuario:", djangoPayload);
+    const response = await http.post<CreateUserResponse>("/api/User/create/", finalPayload);
+    
+    if (response.data) {
+      console.log("✅ Usuario creado exitosamente:", response.data);
+      return response.data;
+    }
+    
+    throw new Error("No se recibió respuesta del servidor");
+    
+  } catch (error: unknown) {
+    console.error("❌ Error en createUser:", error);
+    
+    // Verificar si es error de red
+    const isNetworkError = !error || 
+      (typeof error === 'object' && 'code' in error && error.code === 'NETWORK_ERROR') ||
+      (typeof error === 'object' && 'response' in error && !error.response);
 
-  // Intentar varios endpoints comunes (trailing slash / sin slash)
-  const endpoints = ["/api/User/user/", "/api/User/user", "/api/users/", "/api/users"];
-
-  for (const ep of endpoints) {
-    try {
-      console.log(`[users.service] Intentando POST ${ep}`);
-      const response = await http.post<CreateUserResponse>(ep, djangoPayload);
-      console.log("[users.service] Usuario creado en backend:", response.data);
-
-      // Intentar actualizar perfil extendido si aplica (no fallar si no existe)
-      if (userData.telefono || userData.cargo || userData.departamento || userData.avatar) {
-        try {
-          const additionalData = {
-            telefono: userData.telefono,
-            cargo: userData.cargo,
-            departamento: userData.departamento,
-            fecha_ingreso: userData.fecha_ingreso,
-            avatar: userData.avatar,
-            user_permissions: userData.user_permissions,
-          };
-          await http.patch(`/api/User/user/${response.data.id}/profile/`, additionalData);
-          console.log("[users.service] Perfil extendido actualizado");
-        } catch (profileError) {
-          console.warn("[users.service] No se pudo actualizar perfil extendido:", profileError);
-        }
-      }
-
-      return {
-        ...response.data,
+    // Si el servidor no está disponible, simular creación
+    if (isNetworkError) {
+      console.log("📱 Modo offline: simulando creación de usuario");
+      
+      const mockUser: CreateUserResponse = {
+        id: Date.now(),
+        username: userData.username,
+        first_name: userData.first_name,
+        last_name: userData.last_name,
+        email: userData.email,
+        is_staff: userData.is_staff || false,
+        is_active: userData.is_active !== false,
+        is_superuser: userData.is_superuser || false,
+        date_joined: new Date().toISOString(),
         telefono: userData.telefono,
         cargo: userData.cargo,
         departamento: userData.departamento,
         fecha_ingreso: userData.fecha_ingreso,
-        user_permissions: userData.user_permissions,
         avatar: userData.avatar,
+        empresa_id: userData.empresa_id,
+        grupo_id: userData.grupo_id ? Number(userData.grupo_id) : undefined,
+        user_permissions: userData.user_permissions || [],
+        groups: userData.grupo_id ? [Number(userData.grupo_id)] : [],
       };
-    } catch (err: unknown) {
-      const e = err as HttpError;
-      console.warn(`[users.service] POST ${ep} falló:`, {
-        status: e.response?.status,
-        statusText: e.response?.statusText,
-        data: e.response?.data,
-        message: e.message,
-      });
-      // Si el backend devolvió 500 intentamos el siguiente endpoint
-      // si es otro error (autenticación, 4xx) también probamos los otros endpoints
-      // continuar al siguiente endpoint
+      
+      // Guardar en localStorage para persistencia local
+      try {
+        const existingUsers = JSON.parse(localStorage.getItem("mock.users") || "[]");
+        const updatedUsers = [...existingUsers, mockUser];
+        localStorage.setItem("mock.users", JSON.stringify(updatedUsers));
+      } catch (storageError) {
+        console.warn("Error guardando en localStorage:", storageError);
+      }
+      
+      return mockUser;
     }
+    
+    // Relanzar error para manejo en el componente
+    throw error;
   }
-
-  // Si todos los endpoints fallan, guardar localmente como fallback
-  console.warn("[users.service] Todos los endpoints fallaron — guardando usuario localmente");
-
-  const fallbackUser: CreateUserResponse = {
-    id: Date.now(), // ID numérico temporal
-    username: userData.username,
-    first_name: userData.first_name,
-    last_name: userData.last_name,
-    email: userData.email,
-    is_staff: userData.is_staff,
-    is_active: userData.is_active,
-    is_superuser: userData.is_superuser || false,
-    last_login: null,
-    date_joined: new Date().toISOString(),
-    message: "Usuario creado localmente (backend no disponible)",
-    telefono: userData.telefono,
-    cargo: userData.cargo,
-    departamento: userData.departamento,
-    fecha_ingreso: userData.fecha_ingreso,
-    user_permissions: userData.user_permissions,
-    avatar: userData.avatar,
-  };
-
-  try {
-    const existingUsers = JSON.parse(localStorage.getItem("mock.users") || "[]");
-    existingUsers.push(fallbackUser);
-    localStorage.setItem("mock.users", JSON.stringify(existingUsers));
-    console.log("[users.service] Usuario guardado localmente:", fallbackUser);
-  } catch (storageError) {
-    console.error("[users.service] Error guardando en localStorage:", storageError);
-  }
-
-  return fallbackUser;
 }
 
-export async function listUsers(
-  params: ListUsersParams = {}
-): Promise<Page<User>> {
+export async function listUsers(params: ListUsersParams = {}): Promise<Page<User>> {
   const { search, activo = "all", page = 1, page_size = 10 } = params;
 
+  // Obtener empresa_id del usuario actual
+  const currentUser = JSON.parse(localStorage.getItem("auth.me") || "{}");
+  const isSuper = currentUser.roles?.includes("superadmin");
+  const empresaId = currentUser.empresa_id;
+
   try {
-    console.log("[users.service] Cargando usuarios desde backend:", "/api/User/user");
+    console.log("[users.service] Cargando usuarios desde backend");
     
-    const query: Record<string, unknown> = { page, page_size };
-    if (search && search.trim()) query.search = search.trim();
+    const query: Record<string, unknown> = { 
+      page, 
+      page_size,
+      empresa_id: !isSuper ? empresaId : undefined // Solo filtrar por empresa si no es superadmin
+    };
+    
+    if (search?.trim()) query.search = search.trim();
     if (activo !== "all") query.is_active = activo === true;
 
-    // Usar el endpoint correcto del backend Django
     const res = await http.get<BackendPage<UserDTO> | UserDTO[]>("/api/User/user", {
       params: query,
     });
 
-    console.log("[users.service] Usuarios cargados desde backend:", res.data);
-
-    // Normalizar la respuesta
     const normalized = normalizePage<UserDTO>(res.data, page, page_size);
 
-    // Adaptar los usuarios del backend al formato UI
-    const adaptedUsers = normalized.items.map((user) => {
-      // Adaptar estructura Django auth_user a nuestro tipo User
-      const adapted: User = {
-        id: user.id,
-        nombre: user.username || `${user.nombre_completo || user.name || 'Usuario'}`,
-        apellido: "", // Si tienes first_name + last_name separados
-        username: user.username,
-        email: user.email || "",
-        telefono: user.telefono,
-        role: mapDjangoRole(user), // Función para mapear roles
-        activo: user.is_active ?? user.active ?? true,
-        last_login: user.last_login ?? undefined,
-        created_at: user.created_at ?? undefined, // <-- usar created_at del DTO y convertir null -> undefined
-      };
-      return adapted;
-    });
+    const adaptedUsers = normalized.items.map((user) => ({
+      id: user.id,
+      nombre: user.username || `${user.nombre_completo || user.name || 'Usuario'}`,
+      apellido: "", 
+      username: user.username,
+      email: user.email || "",
+      telefono: user.telefono,
+      role: mapDjangoRole(user),
+      activo: user.is_active ?? user.active ?? true,
+      last_login: user.last_login ?? undefined,
+      created_at: user.created_at ?? undefined,
+      empresa_id: user.empresa_id // Añadir empresa_id al usuario
+    }));
 
     return {
       results: adaptedUsers,
@@ -221,8 +200,8 @@ export async function listUsers(
         telefono: user.telefono,
         role: mapDjangoRoleFromLocal(user),
         activo: user.is_active,
-        last_login: user.last_login || undefined, // ✅ Corregido: manejar null
-        created_at: user.date_joined || undefined, // ✅ Corregido: manejar null
+        last_login: user.last_login || undefined,
+        created_at: user.date_joined || undefined,
       }));
 
       return {
@@ -371,8 +350,8 @@ export async function updateUser(userId: string | number, payload: Partial<User>
       telefono: payload.telefono || "",
       role: mapDjangoRoleFromLocal(response.data),
       activo: response.data.is_active,
-      last_login: response.data.last_login || undefined, // ✅ Corregido: manejar null
-      created_at: response.data.date_joined || undefined, // ✅ Corregido: manejar null
+      last_login: response.data.last_login || undefined,
+      created_at: response.data.date_joined || undefined,
       updated_at: new Date().toISOString(),
     };
 
@@ -409,8 +388,8 @@ export async function updateUser(userId: string | number, payload: Partial<User>
         telefono: payload.telefono || "",
         role: mapDjangoRoleFromLocal(updated),
         activo: updated.is_active,
-        last_login: updated.last_login || undefined, // ✅ Corregido: manejar null
-        created_at: updated.date_joined || undefined, // ✅ Corregido: manejar null
+        last_login: updated.last_login || undefined,
+        created_at: updated.date_joined || undefined,
         updated_at: now,
       };
     } else {

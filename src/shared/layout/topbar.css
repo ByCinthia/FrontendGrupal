@@ -1,0 +1,90 @@
+.topbar {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 18px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+  border-bottom: 1px solid rgba(15,23,42,0.06);
+  gap: 12px;
+  z-index: 1100;
+}
+
+.topbar-left {
+  flex: 1;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.topbar-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-right: 6px;
+}
+
+.topbar-user__text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 0;
+}
+
+.topbar-name {
+  color: #0f172a;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.topbar-email {
+  color: #475569;
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.topbar-company-logo {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid rgba(15,23,42,0.06);
+  box-shadow: 0 4px 14px rgba(2,6,23,0.06);
+  flex-shrink: 0;
+}
+
+.topbar-company-placeholder {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: linear-gradient(135deg,#e6eef8, #dbeafe);
+  flex-shrink: 0;
+}
+
+.topbar-logout {
+  margin-left: 8px;
+  padding: 8px 12px;
+  font-weight: 600;
+}
+
+/* responsive: ocultar logo en pantallas muy pequeñas para ganar espacio */
+@media (max-width: 480px) {
+  .topbar-company-logo,
+  .topbar-company-placeholder {
+    display: none;
+  }
+  .topbar-name {
+    max-width: 140px;
+  }
+}

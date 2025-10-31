@@ -9,6 +9,13 @@ import SubscriptionPanel from "../billing/subscriptionPanel";
 import { listPlans } from "../billing/service";
 import type { Plan, SuscripcionResponse } from "../billing/types";
 
+/** Permitir que el host proporcione una función de subida opcional */
+declare global {
+  interface Window {
+    uploadFile?: (file: File) => Promise<string>;
+  }
+}
+
 /** Tipos locales */
 type CreatedEmpresa = {
   empresa_id?: number;
@@ -34,6 +41,15 @@ function isRegisterResponse(obj: unknown): obj is RegisterResponse {
     "empresa_id" in o ||
     "message" in o
   );
+}
+
+/** Helper de subida: si existe window.uploadFile la usa; si no, simula una URL */
+async function uploadImage(file: File): Promise<string> {
+  if (typeof window.uploadFile === "function") {
+    return await window.uploadFile(file);
+  }
+  // simulación simple (no bloqueante)
+  return Promise.resolve(`https://cdn.example.com/uploads/${encodeURIComponent(file.name)}`);
 }
 
 const CompanyRegisterPage: React.FC = () => {
@@ -63,6 +79,12 @@ const CompanyRegisterPage: React.FC = () => {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<string>(form.selected_plan || "basico");
 
+  const [companyLogoFile, setCompanyLogoFile] = useState<File | null>(null);
+  const [companyLogoPreview, setCompanyLogoPreview] = useState<string | null>(form.imagen_url_empresa || null);
+
+  const [userAvatarFile, setUserAvatarFile] = useState<File | null>(null);
+  const [userAvatarPreview, setUserAvatarPreview] = useState<string | null>(form.imagen_url_perfil || null);
+
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const [createdEmpresa, setCreatedEmpresa] = useState<CreatedEmpresa | null>(null);
 
@@ -83,7 +105,37 @@ const CompanyRegisterPage: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [selectedPlanId]);
+  }, []); // cargar una sola vez
+
+  // gestionar previews y archivos (empresa / usuario)
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, target: "company" | "user") => {
+    const file = e.target.files?.[0] ?? null;
+    if (target === "company") {
+      setCompanyLogoFile(file);
+      if (file) {
+        const url = URL.createObjectURL(file);
+        setCompanyLogoPreview(url);
+      } else {
+        setCompanyLogoPreview(null);
+      }
+    } else {
+      setUserAvatarFile(file);
+      if (file) {
+        const url = URL.createObjectURL(file);
+        setUserAvatarPreview(url);
+      } else {
+        setUserAvatarPreview(null);
+      }
+    }
+  };
+
+  // liberar object URLs cuando cambian archivos / desmonta
+  useEffect(() => {
+    return () => {
+      if (companyLogoPreview && companyLogoPreview.startsWith("blob:")) URL.revokeObjectURL(companyLogoPreview);
+      if (userAvatarPreview && userAvatarPreview.startsWith("blob:")) URL.revokeObjectURL(userAvatarPreview);
+    };
+  }, [companyLogoPreview, userAvatarPreview]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -100,14 +152,6 @@ const CompanyRegisterPage: React.FC = () => {
 
     if (name === "email" && !form.email_contacto) {
       setForm(prev => ({ ...prev, email_contacto: value }));
-    }
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, field: "imagen_url_empresa" | "imagen_url_perfil") => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const fakeUrl = `https://ejemplo.com/uploads/${encodeURIComponent(file.name)}`;
-      setForm(prev => ({ ...prev, [field]: fakeUrl }));
     }
   };
 
@@ -138,17 +182,37 @@ const CompanyRegisterPage: React.FC = () => {
         return;
       }
 
+      // subir imágenes si hay archivos seleccionados
+      let uploadedCompanyLogo = form.imagen_url_empresa || "";
+      let uploadedUserAvatar = form.imagen_url_perfil || "";
+
+      if (companyLogoFile) {
+        try {
+          uploadedCompanyLogo = await uploadImage(companyLogoFile);
+        } catch (err) {
+          console.warn("No se pudo subir logo de empresa:", err);
+        }
+      }
+
+      if (userAvatarFile) {
+        try {
+          uploadedUserAvatar = await uploadImage(userAvatarFile);
+        } catch (err) {
+          console.warn("No se pudo subir avatar de usuario:", err);
+        }
+      }
+
       const registrationData = {
         razon_social: form.razon_social,
         email_contacto: form.email_contacto,
         nombre_comercial: form.nombre_comercial,
-        imagen_url_empresa: form.imagen_url_empresa || "",
+        imagen_url_empresa: uploadedCompanyLogo,
         username: form.username,
         password: form.password,
         first_name: form.first_name,
         last_name: form.last_name,
         email: form.email,
-        imagen_url_perfil: form.imagen_url_perfil || "",
+        imagen_url_perfil: uploadedUserAvatar,
         selected_plan: selectedPlanId || form.selected_plan,
       };
 
@@ -193,59 +257,60 @@ const CompanyRegisterPage: React.FC = () => {
   };
 
   return (
-    <section className="auth-container" style={{ display: "flex", justifyContent: "center", padding: 24 }}>
-      <div className="auth-box-modern" style={{ maxWidth: 1100, width: "100%", margin: "0 auto", display: "grid", gridTemplateColumns: "360px 1fr", gap: 24 }}>
-        {/* Columna izquierda: planes */}
-        <aside style={{ background: "var(--card-bg)", padding: 16, borderRadius: 8, border: "1px solid var(--border-color, #ddd)", height: "fit-content" }}>
-          <h3 style={{ marginTop: 0 }}>Planes</h3>
-          <div style={{ display: "grid", gap: 12 }}>
-            {plans.length === 0 && <div style={{ color: "var(--muted, #999)" }}>Cargando planes...</div>}
+    <section className="landing-hero">
+      <div className="auth-box-modern" role="main">
+        {/* Planes: usa estilos de landing.css (.plans-sidebar + .plan-sidebar-card) */}
+        <aside className="plans-sidebar" aria-label="Seleccionar plan">
+          <div className="plans-sidebar__header">
+            <h3 className="plans-sidebar__title">Planes</h3>
+            <p className="plans-sidebar__subtitle">Elige el plan que deseas iniciar para tu empresa.</p>
+          </div>
+
+          <div className="plans-sidebar__list" role="list">
+            {plans.length === 0 && <div style={{ color: "var(--muted)" }}>Cargando planes…</div>}
             {plans.map(p => (
               <button
                 key={p.id}
                 type="button"
+                role="listitem"
+                aria-pressed={selectedPlanId === p.id}
+                className={`plan-sidebar-card ${selectedPlanId === p.id ? "active" : ""} plan-sidebar-card--${p.id}`}
                 onClick={() => {
                   setSelectedPlanId(p.id);
                   setForm(prev => ({ ...prev, selected_plan: p.id }));
                 }}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  padding: 12,
-                  borderRadius: 8,
-                  border: selectedPlanId === p.id ? "2px solid var(--accent, #3ab5ff)" : "1px solid var(--border-color, #ccc)",
-                  background: selectedPlanId === p.id ? "rgba(58,181,255,0.04)" : "transparent",
-                  cursor: "pointer",
-                }}
               >
-                <div>
-                  <strong>{p.name}</strong>
-                  <div style={{ fontSize: 12, color: "var(--muted, #999)" }}>{p.limits.maxUsers} usuarios · {p.limits.maxRequests} req/mes</div>
+                <div className="plan-sidebar-card__header">
+                  <div>
+                    <span className="plan-sidebar-card__name">{p.name}</span>
+                    <div className="plan-sidebar-card__price">${p.priceUsd}/mes</div>
+                  </div>
+                  <span className="plan-sidebar-card__badge">{p.limits.maxUsers} usuarios</span>
                 </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontWeight: 700 }}>${p.priceUsd}/mes</div>
-                  <div style={{ fontSize: 12, color: "var(--muted, #999)" }}>USD</div>
-                </div>
+                <ul className="plan-sidebar-card__features">
+                  <li className="plan-sidebar-card__feature"><span className="plan-sidebar-card__feature-icon">•</span> {p.limits.maxRequests.toLocaleString()} req/mes</li>
+                  {p.limits.maxStorageGB != null && <li className="plan-sidebar-card__feature"><span className="plan-sidebar-card__feature-icon">•</span> {p.limits.maxStorageGB} GB almacenamiento</li>}
+                </ul>
               </button>
             ))}
           </div>
-          <div style={{ marginTop: 12, fontSize: 13, color: "var(--muted, #999)" }}>
-            Seleccione un plan. Tras registrar la empresa podrá confirmar la suscripción.
+
+          <div className="plans-sidebar__footer" style={{ marginTop: 12 }}>
+            <small className="muted">Tras crear la empresa podrás confirmar la suscripción.</small>
           </div>
         </aside>
 
-        {/* Columna derecha: formulario */}
-        <div className="auth-right" style={{ width: "100%" }}>
-          <form className="auth-form-modern" onSubmit={handleSubmit} noValidate>
+        {/* Formulario: usa .auth-right */}
+        <div className="auth-right" aria-label="Formulario de registro">
+          <form onSubmit={handleSubmit} className="auth-form-modern" noValidate>
             <h2>Registro de Empresa</h2>
-            <p>Complete los datos de su empresa y usuario administrador</p>
+            <p style={{ color: "var(--muted)" }}>Complete los datos de su empresa y usuario administrador</p>
 
             {message.text && <div className={`message ${message.type}`}>{message.text}</div>}
 
-            <fieldset style={{ border: "1px solid #e2e8f0", padding: "16px", borderRadius: "6px", marginBottom: "16px" }}>
-              <legend style={{ fontWeight: "bold", color: "#1f2937" }}>🏢 Datos de la Empresa</legend>
-              
+            <fieldset className="card" style={{ marginBottom: 16 }}>
+              <legend>🏢 Datos de la Empresa</legend>
+
               <div className="input-group">
                 <span className="input-icon">🏢</span>
                 <input type="text" name="nombre_comercial" placeholder="Nombre comercial *" value={form.nombre_comercial} onChange={handleChange} required />
@@ -258,22 +323,24 @@ const CompanyRegisterPage: React.FC = () => {
 
               <div className="input-group">
                 <span className="input-icon">📧</span>
-                <input type="email" name="email_contacto" placeholder="Email de contacto de la empresa *" value={form.email_contacto} onChange={handleChange} required />
+                <input type="email" name="email_contacto" placeholder="Email de contacto *" value={form.email_contacto} onChange={handleChange} required />
               </div>
 
-              <div className="input-group">
-                <span className="input-icon">🖼️</span>
-                <label style={{ display: "flex", alignItems: "center", cursor: "pointer" }}>
-                  <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, "imagen_url_empresa")} style={{ display: "none" }} />
-                  <span style={{ color: "#6b7280", fontSize: "14px" }}>{form.imagen_url_empresa ? "Logo cargado ✓" : "Subir logo de la empresa"}</span>
+              <div className="input-group" style={{ alignItems: "center", gap: 12 }}>
+                <label className="ghost-btn" style={{ display: "inline-flex", gap: 8, alignItems: "center", cursor: "pointer" }}>
+                  <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, "company")} style={{ display: "none" }} />
+                  <span>{companyLogoPreview ? "Cambiar logo" : "Subir logo de la empresa"}</span>
                 </label>
+                {companyLogoPreview && (
+                  <img src={companyLogoPreview} alt="Logo empresa" style={{ width: 64, height: 64, objectFit: "cover", borderRadius: 8, border: "1px solid rgba(255,255,255,0.06)" }} />
+                )}
               </div>
             </fieldset>
 
-            <fieldset style={{ border: "1px solid #e2e8f0", padding: "16px", borderRadius: "6px", marginBottom: "16px" }}>
-              <legend style={{ fontWeight: "bold", color: "#1f2937" }}>👤 Usuario Administrador</legend>
-              
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+            <fieldset className="card" style={{ marginBottom: 16 }}>
+              <legend>👤 Usuario Administrador</legend>
+
+              <div className="register-grid">
                 <div className="input-group">
                   <span className="input-icon">👤</span>
                   <input type="text" name="first_name" placeholder="Nombre *" value={form.first_name} onChange={handleChange} required />
@@ -290,12 +357,22 @@ const CompanyRegisterPage: React.FC = () => {
                 <input type="email" name="email" placeholder="Email del administrador *" value={form.email} onChange={handleChange} required />
               </div>
 
+              <div className="input-group" style={{ alignItems: "center", gap: 12 }}>
+                <label className="ghost-btn" style={{ display: "inline-flex", gap: 8, alignItems: "center", cursor: "pointer" }}>
+                  <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, "user")} style={{ display: "none" }} />
+                  <span>{userAvatarPreview ? "Cambiar foto" : "Subir foto de perfil"}</span>
+                </label>
+                {userAvatarPreview && (
+                  <img src={userAvatarPreview} alt="Avatar usuario" style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 999, border: "1px solid rgba(255,255,255,0.06)" }} />
+                )}
+              </div>
+
               <div className="input-group">
                 <span className="input-icon">🔑</span>
                 <input type="text" name="username" placeholder="Nombre de usuario *" value={form.username} onChange={handleChange} required />
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+              <div className="register-grid" style={{ marginTop: 8 }}>
                 <div className="input-group">
                   <span className="input-icon">🔒</span>
                   <input type="password" name="password" placeholder="Contraseña *" value={form.password} onChange={handleChange} required />
@@ -306,21 +383,18 @@ const CompanyRegisterPage: React.FC = () => {
                   <input type="password" name="confirm_password" placeholder="Confirmar contraseña *" value={form.confirm_password} onChange={handleChange} required />
                 </div>
               </div>
-
-              <div className="input-group">
-                <span className="input-icon">🖼️</span>
-                <label style={{ display: "flex", alignItems: "center", cursor: "pointer" }}>
-                  <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, "imagen_url_perfil")} style={{ display: "none" }} />
-                  <span style={{ color: "#6b7280", fontSize: "14px" }}>{form.imagen_url_perfil ? "Foto de perfil cargada ✓" : "Subir foto de perfil"}</span>
-                </label>
-              </div>
             </fieldset>
 
-            <button type="submit" className="auth-button-modern" disabled={loading}>{loading ? "Registrando empresa..." : "Registrar Empresa"}</button>
-
-            <div style={{ textAlign: "center", marginTop: "16px" }}>
-              <span style={{ color: "#6b7280" }}>¿Ya tienes una cuenta? </span>
-              <button type="button" className="link-button" onClick={() => navigate("/login")}>Iniciar sesión</button>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+              <button type="submit" className="ui-btn ui-btn--primary" disabled={loading}>
+                {loading ? "Registrando empresa..." : "Registrar Empresa"}
+              </button>
+              <div style={{ textAlign: "right" }}>
+                <small style={{ color: "var(--muted)" }}>¿Ya tienes una cuenta?</small>
+                <div>
+                  <button type="button" className="ui-btn ui-btn--ghost" onClick={() => navigate("/login")}>Iniciar sesión</button>
+                </div>
+              </div>
             </div>
           </form>
         </div>

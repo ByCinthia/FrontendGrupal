@@ -35,76 +35,21 @@ import PersonalizacionPage from "./modules/personalizacion/personalizacion";
 import BackupPage from "./modules/backup/backup";
 import HistorialActividadesPage from "./modules/actividades/historial_simple";
 import DashboardIngresos from "./modules/ingresos/dashboard";
-
-// Página de configuración temporal
-const ConfigurationPage: React.FC = () => (
-  <section className="page">
-    <div style={{ padding: "24px", textAlign: "center" }}>
-      <h2>⚙️ Configuración</h2>
-      <p style={{ color: "#6b7280" }}>
-        Esta sección está en desarrollo. Próximamente podrás configurar:
-      </p>
-      <ul style={{ textAlign: "left", maxWidth: "400px", margin: "0 auto" }}>
-        <li>Configuración de la empresa</li>
-        <li>Preferencias del sistema</li>
-        <li>Integración con APIs externas</li>
-        <li>Configuración de notificaciones</li>
-      </ul>
-    </div>
-  </section>
-);
+import { Link } from "react-router-dom";
 
 // Componente de inicio mejorado
 export function Inicio() {
-  const { user, loading, logout } = useAuth();
-  
-  if (loading) {
-    return (
-      <section className="page">
-        <div style={{ 
-          display: "flex", 
-          alignItems: "center", 
-          justifyContent: "center",
-          minHeight: "200px",
-          fontSize: "16px",
-          color: "#6b7280"
-        }}>
-          <span>🔄 Cargando tu sesión...</span>
-        </div>
-      </section>
-    );
-  }
+  const { user, logout } = useAuth(); // eliminé loading ya que no se usa
 
-  const handleLogout = async () => {
-    if (confirm("¿Estás seguro que quieres cerrar sesión?")) {
-      await logout();
-    }
-  };
-
-  // Obtener información de la empresa
+  // helpers corregidos - definir las funciones que faltaban
   const getCompanyInfo = () => {
-    const defaultCompany = "Mi Empresa";
-    
-    if (user?.empresa_nombre) return user.empresa_nombre;
-    
-    // Intentar obtener de localStorage como fallback
-    try {
-      const authData = localStorage.getItem("auth.me") || localStorage.getItem("auth");
-      if (authData) {
-        const parsed = JSON.parse(authData);
-        return parsed?.empresa_nombre || parsed?.user?.empresa_nombre || defaultCompany;
-      }
-    } catch {
-      // Si hay error parseando, usar valor por defecto
-    }
-    
-    return defaultCompany;
+    return user?.empresa_nombre || "WF Finanzas";
   };
 
   const getUserDisplay = () => {
     if (user?.nombre_completo?.trim()) return user.nombre_completo;
     if (user?.username?.trim()) return user.username;
-    if (user?.email?.includes("@")) return user.email.split("@")[0];
+    if (user?.email && user.email.includes("@")) return user.email.split("@")[0];
     return "Usuario";
   };
 
@@ -114,10 +59,21 @@ export function Inicio() {
     return "Usuario";
   };
 
+  const handleLogout = async () => {
+    if (confirm("¿Estás seguro que quieres cerrar sesión?")) {
+      await logout();
+    }
+  };
+
+  // usar las funciones definidas, no llamarlas como variables
   const companyName = getCompanyInfo();
   const userDisplay = getUserDisplay();
   const userRole = getUserRole();
-  
+
+  // obtener preview de personalización desde localStorage
+  const companyLogo = typeof window !== "undefined" ? localStorage.getItem("ui.company.logo") : null;
+  const accent = typeof window !== "undefined" ? localStorage.getItem("ui.accent_color") || localStorage.getItem("ui.accent-primary") : null;
+
   return (
     <section className="page">
       {/* Header principal */}
@@ -230,88 +186,86 @@ export function Inicio() {
         </div>
       </div>
       
-      {/* Enlaces rápidos mejorados */}
+      {/* Enlaces rápidos */}
       <div>
-        <h3 style={{ 
-          margin: "0 0 16px 0",
-          color: "#1f2937",
-          fontSize: "18px",
-          fontWeight: "600"
-        }}>
+        <h3 style={{ margin: "0 0 16px 0", color: "#1f2937", fontSize: "18px", fontWeight: "600" }}>
           🚀 Accesos Rápidos
         </h3>
-        <div style={{ 
-          display: "grid", 
-          gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", 
-          gap: "16px" 
-        }}>
-          <div style={{ 
-            padding: "20px", 
-            backgroundColor: "white", 
-            borderRadius: "12px", 
-            border: "1px solid #e2e8f0",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-            transition: "all 0.2s",
-            cursor: "pointer"
-          }}>
-            <h4 style={{ margin: "0 0 8px 0", color: "#1e40af", fontSize: "16px" }}>
-              📊 Dashboard
-            </h4>
-            <p style={{ margin: "0", fontSize: "14px", color: "#6b7280" }}>
-              Panel principal con métricas y estadísticas de tu empresa
-            </p>
-          </div>
-          
-          <div style={{ 
-            padding: "20px", 
-            backgroundColor: "white", 
-            borderRadius: "12px", 
-            border: "1px solid #e2e8f0",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-            transition: "all 0.2s",
-            cursor: "pointer"
-          }}>
-            <h4 style={{ margin: "0 0 8px 0", color: "#16a34a", fontSize: "16px" }}>
-              👥 Usuarios
-            </h4>
-            <p style={{ margin: "0", fontSize: "14px", color: "#6b7280" }}>
-              Gestión completa de usuarios y permisos del sistema
-            </p>
-          </div>
-          
-          <div style={{ 
-            padding: "20px", 
-            backgroundColor: "white", 
-            borderRadius: "12px", 
-            border: "1px solid #e2e8f0",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-            transition: "all 0.2s",
-            cursor: "pointer"
-          }}>
-            <h4 style={{ margin: "0 0 8px 0", color: "#ea580c", fontSize: "16px" }}>
-              💰 Facturación
-            </h4>
-            <p style={{ margin: "0", fontSize: "14px", color: "#6b7280" }}>
-              Control de pagos, suscripciones y facturación
-            </p>
-          </div>
-          
-          <div style={{ 
-            padding: "20px", 
-            backgroundColor: "white", 
-            borderRadius: "12px", 
-            border: "1px solid #e2e8f0",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-            transition: "all 0.2s",
-            cursor: "pointer"
-          }}>
-            <h4 style={{ margin: "0 0 8px 0", color: "#7c3aed", fontSize: "16px" }}>
-              📈 Reportes
-            </h4>
-            <p style={{ margin: "0", fontSize: "14px", color: "#6b7280" }}>
-              Análisis detallados y reportes personalizados
-            </p>
-          </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "16px" }}>
+          {/* Dashboard */}
+          <Link to="/app" style={{ textDecoration: "none" }}>
+            <div className="quick-card">
+              <h4>📊 Dashboard</h4>
+              <p>Panel principal con métricas y estadísticas de tu empresa</p>
+            </div>
+          </Link>
+
+          {/* Empresas - solo superadmin */}
+          {user?.roles?.includes("superadmin") && (
+            <Link to="/app/empresas" style={{ textDecoration: "none" }}>
+              <div className="quick-card">
+                <h4>🏢 Empresas</h4>
+                <p>Gestión global de empresas registradas</p>
+              </div>
+            </Link>
+          )}
+
+          {/* Usuarios - superadmin y admin */}
+          {(user?.roles?.includes("superadmin") || user?.roles?.includes("admin")) && (
+            <Link to="/app/usuarios" style={{ textDecoration: "none" }}>
+              <div className="quick-card">
+                <h4>👥 Usuarios</h4>
+                <p>Gestión de usuarios y permisos</p>
+              </div>
+            </Link>
+          )}
+
+          {/* Personalización - ahora disponible para todos */}
+          <Link to="/app/personalizacion" style={{ textDecoration: "none" }}>
+            <div className="quick-card" style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{
+                width: 48,
+                height: 48,
+                borderRadius: 8,
+                background: companyLogo ? `url(${companyLogo}) center/cover` : (accent || "#3b82f6"),
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "white",
+                fontWeight: "700",
+                fontSize: 18
+              }}>
+                {!companyLogo && companyName.charAt(0)}
+              </div>
+              <div>
+                <h4 style={{ margin: 0 }}>🎨 Personalización</h4>
+                <p style={{ margin: 0, color: "#6b7280" }}>Ajusta temas, logo y apariencia</p>
+              </div>
+            </div>
+          </Link>
+
+          {/* Módulos comunes para todos (sin Configuración) */}
+          <Link to="/app/reportes" style={{ textDecoration: "none" }}>
+            <div className="quick-card">
+              <h4>📈 Reportes</h4>
+              <p>Análisis detallados y reportes personalizados</p>
+            </div>
+          </Link>
+
+          <Link to="/app/ingresos" style={{ textDecoration: "none" }}>
+            <div className="quick-card">
+              <h4>💹 Ingresos</h4>
+              <p>Dashboard financiero y control de ingresos</p>
+            </div>
+          </Link>
+
+          <Link to="/app/pagos" style={{ textDecoration: "none" }}>
+            <div className="quick-card">
+              <h4>💳 Pagos</h4>
+              <p>Gestión de pagos y transacciones</p>
+            </div>
+          </Link>
         </div>
       </div>
     </section>
@@ -388,7 +342,6 @@ const router = createBrowserRouter([
         children: [{ path: "solicitar", element: <SolicitarCredito /> }],
       },
       { path: "pagos", element: <PagosPage /> },
-      { path: "configuracion", element: <ConfigurationPage /> },
     ],
   },
   { path: "*", element: <Navigate to="/" replace /> },

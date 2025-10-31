@@ -311,7 +311,9 @@ export async function apiRegisterCompanyAndUser(payload: {
     const userDto: UserDTO = {
       ...data.user,
       empresa_id: data.empresa_id,
-      is_staff: true, // Admin de la empresa que acaba de crear
+      is_staff: true, // Asegura que es staff
+      global_roles: ["admin"], // Usar global_roles en lugar de roles
+      permissions: ["*"], // Da todos los permisos dentro de su empresa
     };
     
     const result = {
@@ -321,8 +323,7 @@ export async function apiRegisterCompanyAndUser(payload: {
       user: mapUser(userDto),
       empresa_id: data.empresa_id,
     };
-    
-    console.log("Resultado procesado:", result);
+
     return result;
   } catch (error) {
     console.error("Error en apiRegisterCompanyAndUser:", error);

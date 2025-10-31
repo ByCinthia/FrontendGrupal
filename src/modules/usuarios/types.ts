@@ -2,36 +2,40 @@
 
 export type UserDTO = {
   id: number | string;
-  email: string;
   username?: string;
+  email?: string;
   nombre_completo?: string;
   name?: string;
-  telefono?: string;
-  direccion?: string;
-  role?: string;
+  first_name?: string;
+  last_name?: string;
   is_active?: boolean;
   active?: boolean;
-  estado?: "ACTIVO" | "INACTIVO";
+  is_staff?: boolean;
+  is_superuser?: boolean;
   last_login?: string | null;
-  created_at?: string | null;
+  created_at?: string;
+  role?: string;
+  telefono?: string;
+  empresa_id?: number | string; // Añadimos empresa_id al DTO
+  global_roles?: string[];
+  permissions?: string[];
+  estado?: string; // agregado para compatibilidad con algunos backends
 };
 
 // Tipo normalizado que usaremos en el UI
 export interface User {
-  id: string | number;
+  id: number | string;
   nombre: string;
   apellido?: string;
   username?: string;
-  email?: string;
+  email: string;
   telefono?: string;
-  role: "superadmin" | "administrador" | "gerente" | "contador" | "usuario";
-  activo?: boolean;
-  last_login?: string | null;
-  group_id?: number; // ID del grupo asignado al usuario
-
-  // Metadatos de auditoría (opcional)
+  role?: string;
+  activo: boolean;
+  last_login?: string;
   created_at?: string;
   updated_at?: string;
+  empresa_id?: number | string; // También lo añadimos a la interfaz User
 }
 
 // Tipo exacto para la tabla Django auth_user (estructura backend)
@@ -64,25 +68,57 @@ export interface DjangoUserResponse {
 }
 
 // Tipo para crear usuarios (payload que se envía al backend)
-export interface CreateUserPayload extends DjangoUserPayload {
-  // Campos adicionales específicos de tu app (no van a auth_user)
+export interface CreateUserPayload {
+  // Campos básicos de Django User
+  username: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  password?: string;
+  is_staff?: boolean;
+  is_active?: boolean;
+  is_superuser?: boolean;
+  
+  // Campos adicionales del perfil
   telefono?: string;
   cargo?: string;
   departamento?: string;
   fecha_ingreso?: string;
-  user_permissions?: string[];
   avatar?: string;
+  
+  // Campos de relaciones y permisos
+  grupo_id?: number | string;
+  user_permissions?: string[];
+  empresa_id?: number;
+  
+  // Campos opcionales adicionales
+  groups?: number[];
+  date_joined?: string;
+  last_login?: string;
 }
 
-// Respuesta extendida del backend
-export interface CreateUserResponse extends DjangoUserResponse {
-  // Campos adicionales que puede devolver tu backend
+export interface CreateUserResponse {
+  id: number;
+  username: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  is_staff: boolean;
+  is_active: boolean;
+  is_superuser: boolean;
+  date_joined: string;
+  last_login?: string;
+  
+  // Campos adicionales
   telefono?: string;
   cargo?: string;
   departamento?: string;
   fecha_ingreso?: string;
-  user_permissions?: string[];
   avatar?: string;
+  empresa_id?: number;
+  grupo_id?: number;
+  user_permissions?: string[];
+  groups?: number[];
 }
 
 export type ListUsersParams = {
@@ -126,24 +162,29 @@ const mapRole = (r?: string): User["role"] => {
 export const adaptUser = (d: UserDTO): User => ({
   // Asegurar que id sea compatible con string | number
   id: d.id,
-  email: d.email,
+  // email en UI es requerido; si backend no lo provee, usamos cadena vacía
+  email: d.email ?? "",
   username: d.username,
   nombre:
     (d.nombre_completo && d.nombre_completo.trim()) ||
     (d.name && d.name.trim()) ||
     (d.username && d.username.trim()) ||
-    (d.email?.includes("@") ? d.email.split("@")[0]! : "usuario"),
+    (d.email && d.email.includes("@") ? d.email.split("@")[0]! : "usuario"),
+  apellido: d.last_name ?? undefined,
   telefono: d.telefono,
   // Asegurar que mapRole siempre devuelve un valor válido
   role: mapRole(d.role),
-  activo: typeof d.is_active === "boolean"
-    ? d.is_active
-    : typeof d.active === "boolean"
-    ? d.active
-    : d.estado === "ACTIVO",
-  last_login: d.last_login ?? null,
+  activo:
+    typeof d.is_active === "boolean"
+      ? d.is_active
+      : typeof d.active === "boolean"
+      ? d.active
+      : ((d.estado ?? "").toString().toUpperCase() === "ACTIVO"),
+  // last_login en User es opcional string; evitar asignar null
+  last_login: d.last_login ?? undefined,
   created_at: d.created_at ?? undefined,
   updated_at: undefined,
+  empresa_id: d.empresa_id,
 });
 
 export type UserHistoryEntry = {

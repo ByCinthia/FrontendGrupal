@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom"; // Añadir esta importación
 import { listUsers, setUserActive } from "./service";
 import type { User } from "./types";
-import "../../styles/dashboard.css";
+import "../../../src/styles/users.css";
+import { useAuth } from "../../modules/auth/service"; // Corregir la ruta de importación
 
 import UserEditModal from "./components/UserEditModal";
 import UserHistory from "./components/UserHistory";
@@ -223,6 +225,7 @@ const Pager: React.FC<{
 };
 
 const UsersPage: React.FC = () => {
+  const navigate = useNavigate(); // Añadir hook useNavigate
   const [rows, setRows] = useState<User[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -241,6 +244,32 @@ const UsersPage: React.FC = () => {
   const meId = useMemo(() => getCurrentUserId(), []);
   const tenantId = useMemo(() => getTenantId(), []);
   const myRole = useMemo(() => getCurrentUserRole(), []);
+
+  const { user } = useAuth();
+  const isSuperAdmin = user?.roles?.includes("superadmin");
+  const isCompanyAdmin = user?.roles?.includes("admin") && user?.empresa_id;
+
+  // Verificar permisos básicos
+  useEffect(() => {
+    if (!isSuperAdmin && !isCompanyAdmin) {
+      navigate("/app");
+    }
+  }, [isSuperAdmin, isCompanyAdmin, navigate]); // incluir navigate para cumplir exhaustive-deps
+
+  const canCreateUser = useCallback(() => {
+    if (isSuperAdmin) return true;
+    if (isCompanyAdmin) return perms.has("user.create");
+    return false;
+  }, [isSuperAdmin, isCompanyAdmin, perms]);
+
+  const canEditUser = useCallback((targetUser: User) => {
+    if (isSuperAdmin) return true;
+    if (isCompanyAdmin) {
+      // comparar como string por seguridad (puede ser number | string)
+      return String(targetUser.empresa_id ?? "") === String(user?.empresa_id ?? "") && perms.has("user.edit");
+    }
+    return false;
+  }, [isSuperAdmin, isCompanyAdmin, user?.empresa_id, perms]);
 
   const filters = useMemo(
     () => ({ search, activo, page, page_size: pageSize, tenant_id: tenantId ?? undefined }),
@@ -306,7 +335,19 @@ const UsersPage: React.FC = () => {
 
   return (
     <section className="page">
-      <h1 className="ui-title">Gestión de usuarios</h1>
+      <div className="ui-page__header">
+        <h1 className="ui-title">
+          {isSuperAdmin ? "Gestión Global de Usuarios" : "Usuarios de la Empresa"}
+        </h1>
+        {canCreateUser() && (
+          <button 
+            className="ui-btn ui-btn--primary"
+            onClick={() => navigate("/app/crear-usuario")}
+          >
+            Crear Usuario
+          </button>
+        )}
+      </div>
 
       {/* Toolbar + Table */}
       <Toolbar
@@ -337,10 +378,10 @@ const UsersPage: React.FC = () => {
                   u={u}
                   onToggle={handleToggle}
                   busyId={busyId}
-                  canToggle={canToggle}
+                  canToggle={(u) => canEditUser(u)}
                   isSelf={isSelf}
-                  onEdit={(user) => setEditingUser(user)}
-                  onHistory={(id) => setHistoryUserId(id)}
+                  onEdit={canEditUser(u) ? (user) => setEditingUser(user) : undefined}
+                  onHistory={canEditUser(u) ? (id) => setHistoryUserId(id) : undefined}
                 />
               ))}
             </tbody>
