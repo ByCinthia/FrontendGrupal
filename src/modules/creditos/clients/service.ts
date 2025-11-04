@@ -56,3 +56,8 @@ export async function listClients(): Promise<Cliente[]> {
 
   throw new Error("No se pudieron cargar los clientes desde el servidor");
 }
+
+
+
+
+/// te odio vagner
