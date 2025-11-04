@@ -9,6 +9,7 @@
   --sidebar-text-bright: #f1f5f9;
   --sidebar-accent: #3b82f6;
   --sidebar-danger: #ef4444;
+  --sidebar-success: #10b981;
   --sidebar-spacing-xs: 6px;
   --sidebar-spacing-sm: 8px;
   --sidebar-spacing-md: 12px;
@@ -16,6 +17,7 @@
   --sidebar-spacing-xl: 24px;
   --sidebar-radius: 8px;
   --sidebar-radius-lg: 12px;
+  --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* ========== CONTENEDOR PRINCIPAL ========== */
@@ -29,9 +31,9 @@
   border-right: 1px solid var(--sidebar-border);
   display: flex;
   flex-direction: column;
-  transition: width 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 1000;
-  box-shadow: 4px 0 18px rgba(0, 0, 0, 0.16);
+  box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
   overflow: hidden;
 }
 
@@ -39,63 +41,119 @@
   width: var(--sidebar-collapsed);
 }
 
-/* ========== PERFIL DE USUARIO (SIMPLIFICADO) ========== */
+/* ========== PERFIL DE USUARIO (AJUSTADO: AVATAR MÁS GRANDE Y CENTRADO) ========== */
 .sidebar__profile {
-  padding: var(--sidebar-spacing-lg);
+  padding: var(--sidebar-spacing-xl);
   border-bottom: 1px solid var(--sidebar-border);
-  min-height: 120px;
+  min-height: 160px; /* aumentar para dar espacio al avatar */
   display: flex;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
 }
 
-.user-profile {
+.user-avatar-container {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--sidebar-spacing-sm);
   text-align: center;
+  width: 100%;
 }
 
-.user-profile__avatar {
-  flex-shrink: 0;
-}
-
-.user-profile__info {
-  display: flex;
-  flex-direction: column;
+/* Glow más suave, mayor tamaño y centrado perfecto */
+.user-avatar-glow {
+  position: relative;
+  padding: 6px;
+  border-radius: 9999px; /* fully round container */
+  background: linear-gradient(45deg, var(--sidebar-accent), #8b5cf6);
+  background-size: 300% 300%;
+  animation: glowPulse 4s ease-in-out infinite;
+  display: inline-flex;
   align-items: center;
-  gap: 2px;
+  justify-content: center;
 }
 
-.user-profile__role {
-  color: var(--sidebar-text-muted);
+.user-avatar-glow::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  background: linear-gradient(45deg, var(--sidebar-accent), #8b5cf6);
+  background-size: 300% 300%;
+  border-radius: 9999px;
+  z-index: -1;
+  filter: blur(14px);
+  opacity: 0.6;
+  animation: glowPulse 4s ease-in-out infinite;
+}
+
+/* avatar circular y más grande */
+.user-avatar,
+.user-profile__image--large,
+.user-profile__placeholder--large {
+  width: 88px;
+  height: 88px;
+  border-radius: 9999px; /* círculo perfecto */
+  object-fit: cover;
+  display: inline-block;
+  border: 3px solid rgba(255,255,255,0.06);
+  background: linear-gradient(135deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+/* pequeño efecto al hover del avatar */
+.user-avatar:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 8px 30px rgba(59,130,246,0.18);
+}
+
+.user-name {
+  color: var(--sidebar-text-bright);
+  font-weight: 600;
+  font-size: 16px;
+  text-align: center;
+  margin-top: 8px;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* mostrar empresa/brand debajo (si existe) */
+.brand-name {
   font-size: 12px;
-  font-weight: 500;
+  color: var(--sidebar-text-muted);
+  margin-top: 4px;
 }
 
-/* ========== HEADER SIMPLIFICADO ========== */
+/* ========== HEADER MODERNIZADO ========== */
 .sidebar__header {
-  padding: var(--sidebar-spacing-md);
+  padding: var(--sidebar-spacing-lg);
   border-bottom: 1px solid var(--sidebar-border);
   display: flex;
-  justify-content: center;
-  min-height: 60px;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 80px;
+  background: rgba(59, 130, 246, 0.05);
 }
 
-.sidebar__toggle {
-  background: transparent;
-  border: none;
-  color: var(--sidebar-text-muted);
-  cursor: pointer;
-  padding: var(--sidebar-spacing-sm);
-  border-radius: var(--sidebar-radius);
-  transition: all 0.2s ease;
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--sidebar-spacing-md);
+  flex: 1;
 }
 
-.sidebar__toggle:hover {
-  background: var(--sidebar-border);
-  color: var(--sidebar-text-bright);
+.brand__logo {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  transition: var(--transition-smooth);
+}
+
+.brand__logo:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 /* ========== NAVEGACIÓN ========== */
@@ -264,4 +322,91 @@
 
 .brand:hover .brand__logo {
   border-color: #667eea;
+}
+
+/* ========== MÓDULOS COMO CÁPSULAS ========== */
+/* estilos base para los "capsules" (usar .module-link en JSX) */
+.module-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  color: var(--sidebar-text);
+  text-decoration: none;
+  border-radius: 9999px; /* cápsula */
+  transition: background 0.18s ease, transform 0.14s ease, box-shadow 0.18s ease;
+  margin: 6px 4px;
+  min-height: 48px;
+  box-sizing: border-box;
+}
+
+/* icono dentro de la cápsula */
+.module-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.04);
+  color: var(--sidebar-text-bright);
+  flex-shrink: 0;
+  font-size: 18px;
+  transition: background 0.18s ease, transform 0.14s ease;
+}
+
+/* etiqueta */
+.module-label {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* hover: elevar y teñir levemente */
+.module-link:hover {
+  background: rgba(59,130,246,0.08);
+  transform: translateX(6px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+}
+
+/* estado activo: cápsula resaltada */
+.module-link--active {
+  background: linear-gradient(90deg, var(--sidebar-accent), #2563eb);
+  color: #fff;
+  box-shadow: 0 8px 28px rgba(37,99,235,0.22);
+}
+
+.module-link--active .module-icon {
+  background: rgba(255,255,255,0.12);
+  transform: scale(1.03);
+}
+
+/* estado colapsado: solo icono centrado */
+.sidebar--collapsed .module-link {
+  justify-content: center;
+  padding: 10px;
+  min-height: 56px;
+}
+
+.sidebar--collapsed .module-label {
+  display: none;
+}
+
+/* tooltips cuando está colapsado (mejor posicionamiento) */
+.sidebar--collapsed .module-link:hover::after {
+  content: attr(title);
+  position: fixed;
+  left: calc(var(--sidebar-collapsed) + 12px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(10,12,16,0.94);
+  color: var(--sidebar-text-bright);
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  z-index: 1400;
+  box-shadow: 0 8px 24px rgba(2,6,23,0.6);
+  white-space: nowrap;
 }

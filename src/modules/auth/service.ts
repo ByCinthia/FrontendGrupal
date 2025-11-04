@@ -13,6 +13,8 @@ import type {
   ProfileDTO,
   AuthCtx,
   GlobalRole,
+  TenantRole,
+  OrgRolesMap,
 } from "./types";
 
 /* ========= helpers ========= */
@@ -22,18 +24,39 @@ function deriveGlobalRoles(u: UserDTO): GlobalRole[] {
   const explicit = u.global_roles as GlobalRole[] | undefined;
   if (Array.isArray(explicit) && explicit.length) return explicit;
   
-  // Si es superuser y NO tiene empresa, es superadmin global
-  if (u.is_superuser && !u.empresa_id) return ["superadmin", "platform_admin"];
+  console.log('🔍 [deriveGlobalRoles] Datos:', {
+    is_superuser: u.is_superuser,
+    is_staff: u.is_staff,
+    empresa_id: u.empresa_id,
+  });
   
-  // Si es staff (pero tiene empresa), es admin de esa empresa
-  if (u.is_staff && u.empresa_id) return ["admin"];
+  // Superuser SIN empresa => superadmin de plataforma (acceso global)
+  if (u.is_superuser && !u.empresa_id) {
+    console.log('✅ Rol: superadmin (acceso a todas las empresas)');
+    return ["superadmin", "platform_admin"];
+  }
   
+  // Staff CON empresa => admin de esa empresa específica
+  if (u.is_staff && u.empresa_id) {
+    console.log('✅ Rol: admin (administrador de empresa)');
+    return ["admin"];
+  }
+  
+  // Usuario normal: tiene empresa pero NO es staff
+  console.log('✅ Rol: user (usuario regular)');
   return ["user"];
 }
 
 /** Convierte un UserDTO del backend a AuthUser del dominio */
 function mapUser(u: UserDTO): AuthUser {
   const roles = deriveGlobalRoles(u);
+  
+  // Permisos: superadmin => global "*", admin (empresa) => permisos limitados a la empresa
+  const permissions = roles.includes("superadmin")
+    ? ["*"]
+    : roles.includes("admin")
+    ? ["company:*"] // permiso especial para admins de empresa
+    : undefined;
   
   return {
     id: u.id,
@@ -45,7 +68,7 @@ function mapUser(u: UserDTO): AuthUser {
     empresa_id: u.empresa_id,
     empresa_nombre: u.empresa_nombre,
     tenant_id: u.tenant_id ?? u.empresa_id, // compat
-    permissions: roles.includes("superadmin") ? ["*"] : undefined,
+    permissions,
   };
 }
 
@@ -98,6 +121,34 @@ function clearSession() {
   localStorage.removeItem("auth");
 }
 
+/** Parsea org_roles desde respuesta del backend */
+function parseOrgRoles(raw: unknown): OrgRolesMap {
+  if (!raw || typeof raw !== "object") return {};
+  const parsed = raw as Record<string, unknown>;
+  const result: OrgRolesMap = {};
+
+  const allowed: TenantRole[] = [
+    "administrador",
+    "gerente",
+    "vendedor",
+    "contador",
+    "almacenista",
+  ];
+  const allowedSet = new Set(allowed);
+
+  for (const [key, val] of Object.entries(parsed)) {
+    let candidate: string | undefined;
+    if (typeof val === "string") candidate = val;
+    else if (Array.isArray(val) && val.length > 0 && typeof val[0] === "string") candidate = val[0];
+
+    if (candidate && allowedSet.has(candidate as TenantRole)) {
+      result[key] = candidate as TenantRole;
+    }
+    // Si no es válido, omitimos la entrada (evita asignar valores no permitidos)
+  }
+  return result;
+}
+
 /** Extrae mensaje de error de la respuesta */
 function extractApiMessage(data: unknown): string | undefined {
   if (typeof data === "string") return data;
@@ -129,8 +180,8 @@ function extractAxiosResponseData(err: unknown): unknown | null {
   if (!err || typeof err !== "object") return null;
   const e = err as Record<string, unknown>;
   const response = e.response as Record<string, unknown> | undefined;
-  if (!response) return null;
-  return response.data ?? null;
+  const data = response?.data ?? null;
+  return data;
 }
 
 /* ========= USUARIOS DEMO ========= */
@@ -191,81 +242,113 @@ export async function apiLogin(payload: LoginInput): Promise<AuthResponse> {
     }
 
     // Endpoint real de login
-    const { data } = await http.post("/api/auth/login/", payload, {
+    const { data } = await http.post<unknown>("/api/auth/login/", payload, {
       headers: { Authorization: "" },
     });
 
     console.log('[AUTH] ✅ Respuesta del backend:', data);
-
-    const token = typeof data?.token === "string" ? data.token : undefined;
-    if (!token) {
-      throw new Error("El servidor no devolvió un token válido");
-    }
-
-    // Construir UserDTO con datos de empresa
-    const userDto: UserDTO = {
-      id: data?.user?.id ?? data?.user_id ?? -1,
-      username: data?.user?.username ?? data?.username,
-      email: data?.user?.email ?? data?.email ?? payload.email,
-      nombre_completo: data?.user?.nombre_completo ?? data?.nombre_completo,
-      is_superuser: data?.user?.is_superuser ?? data?.is_superuser ?? false,
-      is_staff: data?.user?.is_staff ?? data?.is_staff ?? false,
-      empresa_id: data?.empresa_id ?? data?.user?.empresa_id,
-      empresa_nombre: data?.empresa_nombre ?? data?.user?.empresa_nombre,
-      tenant_id: data?.empresa_id ?? null,
-      global_roles: data?.user?.global_roles as GlobalRole[] | undefined,
-      org_roles: parseOrgRoles(data?.user?.org_roles ?? data?.org_roles),
+    
+    // Normalizar respuesta sin usar `any` y parsear org_roles si existe
+    const resp = (data && typeof data === "object") ? (data as Record<string, unknown>) : {};
+    
+    const rawUserObj =
+      resp && "user" in resp && typeof resp.user === "object"
+        ? (resp.user as Record<string, unknown>)
+        : (resp as Record<string, unknown>);
+    
+    const getString = (o: Record<string, unknown>, k: string) =>
+      typeof o[k] === "string" ? (o[k] as string) : undefined;
+    const getNumber = (o: Record<string, unknown>, k: string) => {
+      if (typeof o[k] === "number") return o[k] as number;
+      if (typeof o[k] === "string" && o[k] !== "" && !Number.isNaN(Number(o[k]))) return Number(o[k]);
+      return undefined;
     };
-
-    const authUser = mapUser(userDto);
-
-    // VALIDACIÓN: Verificar que el usuario pertenezca a una empresa (excepto superadmin)
-    if (!authUser.roles?.includes("superadmin") && !authUser.empresa_id) {
-      throw new Error("Este usuario no está asociado a ninguna empresa. Contacte al administrador.");
+    const getBoolean = (o: Record<string, unknown>, k: string) =>
+      typeof o[k] === "boolean" ? (o[k] as boolean) : undefined;
+    const getUnknown = (o: Record<string, unknown>, k: string) => o[k];
+    
+    const userDto: UserDTO = {
+      id: (getNumber(rawUserObj, "id") ?? getNumber(rawUserObj, "user_id") ?? getString(rawUserObj, "id") ?? getString(rawUserObj, "user_id")) as unknown as string | number,
+      username: getString(rawUserObj, "username") ?? getString(rawUserObj, "email") ?? "",
+      email: getString(rawUserObj, "email") ?? "",
+      nombre_completo: getString(rawUserObj, "nombre_completo") ?? undefined,
+      is_superuser: getBoolean(rawUserObj, "is_superuser") ?? false,
+      is_staff: getBoolean(rawUserObj, "is_staff") ?? false,
+      empresa_id: getNumber(rawUserObj, "empresa_id") ?? getString(rawUserObj, "empresa_id") ?? undefined,
+      empresa_nombre: getString(rawUserObj, "empresa_nombre") ?? undefined,
+      tenant_id: getNumber(rawUserObj, "tenant_id") ?? getString(rawUserObj, "tenant_id") ?? undefined,
+      org_roles: parseOrgRoles(getUnknown(rawUserObj, "org_roles")),
+      global_roles: undefined,
+    };
+    
+    // Mapea a AuthUser usando mapUser (reutiliza lógica existente)
+    const mappedUser = mapUser(userDto);
+    
+    // Si backend envía un role explícito en la raíz, respetarlo y añadir roles en el mapeo
+    const explicitRole = getString(rawUserObj, "role") ?? getString(resp, "role");
+    if (explicitRole === "superadmin" && !mappedUser.roles?.includes("superadmin")) {
+      mappedUser.roles = [...(mappedUser.roles ?? []), "superadmin"];
+    } else if (explicitRole === "company_admin" && !mappedUser.roles?.includes("admin")) {
+      mappedUser.roles = [...(mappedUser.roles ?? []), "admin"];
     }
-
-    // Persistir sesión
-    await persistSession(token, authUser);
-
+    
+    // Persistir sesión si hay token
+    const tokenVal = getString(resp, "token") ?? undefined;
+    if (tokenVal) {
+      await persistSession(tokenVal, mappedUser);
+    }
+    
     return {
       success: true,
-      message: data?.message ?? "Login exitoso",
-      token,
-      user: authUser,
-      empresa_id: authUser.empresa_id,
+      message: getString(resp, "message") ?? "OK",
+      token: tokenVal,
+      user: mappedUser,
     };
-
   } catch (error) {
-    console.error('[AUTH] ❌ Error en login:', error);
+    console.error("[AUTH] ❌ Error en login:", error);
     
-    const respData = extractAxiosResponseData(error);
-    if (respData) {
-      console.error("❌ Backend response:", respData);
-      
+    // Narrow error con isAxiosError (type guard)
+    if (isAxiosError(error)) {
+      const respData = extractAxiosResponseData(error);
+      console.error("❌ Backend response RAW:", JSON.stringify(respData, null, 2));
+    
       if (respData && typeof respData === "object") {
         const obj = respData as Record<string, unknown>;
-        
-        // Errores específicos de validación
-        if (obj.email && Array.isArray(obj.email)) {
+    
+        const isStringArray = (v: unknown): v is string[] =>
+          Array.isArray(v) && v.every((x) => typeof x === "string");
+    
+        if (isStringArray(obj.email)) {
           throw new Error(`Error en email: ${obj.email[0]}`);
         }
-        if (obj.password && Array.isArray(obj.password)) {
+        if (isStringArray(obj.password)) {
           throw new Error(`Error en password: ${obj.password[0]}`);
         }
-        if (obj.detail) {
-          throw new Error(String(obj.detail));
+        if (isStringArray(obj.non_field_errors)) {
+          throw new Error(`Error: ${obj.non_field_errors[0]}`);
         }
-        if (obj.message) {
-          throw new Error(String(obj.message));
+        if (typeof obj.detail === "string") {
+          throw new Error(obj.detail);
         }
-        if (obj.error) {
-          throw new Error(String(obj.error));
+        if (typeof obj.message === "string") {
+          throw new Error(obj.message);
+        }
+        if (typeof obj.error === "string") {
+          throw new Error(obj.error);
         }
       }
+    
+      // fallback a mensaje extraído o al message de axios
+      const fallback = extractApiMessage(respData) ?? error.message ?? "Error en la petición";
+      throw new Error(String(fallback));
     }
     
-    throw error;
-  }
+    // No es AxiosError: propagar o convertir a Error
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error("Error desconocido");
+   }
 }
 
 export async function apiRegister(payload: RegisterInput): Promise<AuthResponse> {
@@ -280,55 +363,64 @@ export async function apiRegister(payload: RegisterInput): Promise<AuthResponse>
   };
 }
 
-// Nueva función para registrar empresa y usuario
-export async function apiRegisterCompanyAndUser(payload: {
+// Tipo explícito para el payload de registro de empresa + usuario
+type CompanyRegisterPayload = {
   razon_social: string;
   email_contacto: string;
-  nombre_comercial: string;
-  imagen_url_empresa: string;
-  username: string;
-  password: string;
-  first_name: string;
-  last_name: string;
+  nombre_comercial?: string;
+  imagen_url_empresa?: string;
+  username?: string;
+  password?: string;
+  first_name?: string;
+  last_name?: string;
   email: string;
-  imagen_url_perfil: string;
-}): Promise<AuthResponse & { empresa_id?: number }> {
-  try {
-    console.log("Enviando solicitud a /api/register/empresa-user/ con payload:", payload);
-    
-    const { data } = await http.post<{
-      token: string;
-      user: UserDTO;
-      empresa_id: number;
-      message?: string;
-    }>("/api/register/empresa-user/", payload, {
-      headers: { Authorization: "" },
-    });
-    
-    console.log("Respuesta recibida del backend:", data);
-    
-    // Asegurar que el usuario registrado tenga empresa_id
-    const userDto: UserDTO = {
-      ...data.user,
-      empresa_id: data.empresa_id,
-      is_staff: true, // Asegura que es staff
-      global_roles: ["admin"], // Usar global_roles en lugar de roles
-      permissions: ["*"], // Da todos los permisos dentro de su empresa
-    };
-    
-    const result = {
-      success: true,
-      message: data.message ?? "Registro exitoso",
-      token: data.token,
-      user: mapUser(userDto),
-      empresa_id: data.empresa_id,
-    };
+  imagen_url_perfil?: string;
+};
 
-    return result;
-  } catch (error) {
-    console.error("Error en apiRegisterCompanyAndUser:", error);
-    throw error;
+// Nueva función para registrar empresa y usuario (sin `any`)
+export async function apiRegisterCompanyAndUser(
+  payload: CompanyRegisterPayload
+): Promise<AuthResponse & { empresa_id?: number }> {
+  console.log("[auth] calling apiRegisterCompanyAndUser", payload);
+  const res = await http.post("/api/register/empresa-user/", payload);
+  console.log("[auth] register response", res?.data);
+
+  // Forzar flags en cliente si backend no los devuelve
+  const userDto = {
+    ...(res.data?.user || {}),
+    is_staff: res.data?.user?.is_staff ?? true, // forzar true como fallback
+    empresa_id: res.data?.empresa_id ?? res.data?.user?.empresa_id ?? undefined,
+    empresa_nombre: res.data?.empresa_nombre ?? res.data?.user?.empresa_nombre ?? undefined,
+  } as UserDTO;
+  
+  // Mapear a AuthUser y asegurar role 'admin' para este usuario
+  const createdAuthUser = mapUser(userDto);
+  if (!createdAuthUser.roles?.includes("admin")) {
+    createdAuthUser.roles = [...(createdAuthUser.roles ?? []), "admin"];
   }
+  // Dar permisos de admin de empresa (local) para que la UI los trate como administradores
+  createdAuthUser.permissions = createdAuthUser.permissions ?? ["company:*"];
+
+  // Persistir en mock.users para que la UI local lo muestre como admin
+  try {
+    const stored = JSON.parse(localStorage.getItem("mock.users") || "[]");
+    const mock = {
+      id: createdAuthUser.id ?? Date.now(),
+      username: createdAuthUser.username,
+      email: createdAuthUser.email,
+      is_staff: true,
+      is_active: true,
+      empresa_id: createdAuthUser.empresa_id,
+      user_permissions: createdAuthUser.permissions ?? [],
+      date_joined: new Date().toISOString(),
+    };
+    localStorage.setItem("mock.users", JSON.stringify([mock, ...stored]));
+    console.log("[auth] mock.users updated", mock);
+  } catch (e) {
+    console.warn("[auth] cannot persist mock user", e);
+  }
+
+  return { ...res.data, user: createdAuthUser, empresa_id: createdAuthUser.empresa_id };
 }
 
 export async function apiMe(): Promise<AuthResponse> {
@@ -408,178 +500,104 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
     (async () => {
       try {
         const token = localStorage.getItem("auth.token");
-        if (!token) return;
-        const me = await apiMe();
-        if (me.user) {
-          setUser(me.user);
-          await persistSession(token, me.user);
+        if (!token) {
+          setLoading(false);
+          return;
         }
-      } catch {
+        const me = await apiMe();
+        if (me?.user) {
+          setUser(me.user as AuthUser);
+        } else {
+          clearSession();
+          setUser(null);
+        }
+      } catch (e) {
+        console.warn("[auth] fallo al recuperar perfil:", e);
         clearSession();
+        setUser(null);
       } finally {
         setLoading(false);
       }
     })();
   }, []);
 
-  const login = async (email: string, password: string): Promise<AuthResponse> => {
-    try {
-      const res = await apiLogin({ email, password });
-      if (res.success && res.token && res.user) {
-        await persistSession(res.token, res.user);
-        setUser(res.user);
-      }
-      return res;
-    } catch (e) {
-      const msg = humanizeError(e, "No se pudo iniciar sesión.");
-      return { success: false, message: msg };
+  const login = async (payload: LoginInput) => {
+    const res = await apiLogin(payload);
+    if (res.token && res.user) {
+      await persistSession(res.token, res.user);
+      setUser(res.user);
     }
+    return res;
   };
 
-  const register = async (payload: RegisterInput): Promise<AuthResponse> => {
+  const logout = async () => {
     try {
-      const res = await apiRegister(payload);
-      if (res.success && res.token && res.user) {
-        await persistSession(res.token, res.user);
-        setUser(res.user);
-      }
-      return res;
+      await apiLogout();
     } catch (e) {
-      const msg = humanizeError(e, "No se pudo registrar.");
-      return { success: false, message: msg };
-    }
-  };
-
-  const registerCompanyAndUser = async (payload: {
-    razon_social: string;
-    email_contacto: string;
-    nombre_comercial: string;
-    imagen_url_empresa: string;
-    username: string;
-    password: string;
-    first_name: string;
-    last_name: string;
-    email: string;
-    imagen_url_perfil: string;
-  }): Promise<AuthResponse & { empresa_id?: number }> => {
-    try {
-      console.log("Llamando a apiRegisterCompanyAndUser con:", payload);
-      const res = await apiRegisterCompanyAndUser(payload);
-      console.log("Respuesta de apiRegisterCompanyAndUser:", res);
-      if (res.success && res.token && res.user) {
-        await persistSession(res.token, res.user);
-        setUser(res.user);
-      }
-      return res;
-    } catch (e) {
-      console.error("Error en registerCompanyAndUser:", e);
-      const msg = humanizeError(e, "No se pudo registrar la empresa.");
-      return { success: false, message: msg };
-    }
-  };
-
-  const logout = async (): Promise<void> => {
-    try {
-      const token = localStorage.getItem("auth.token");
-      console.log("🚪 Cerrando sesión con token:", token ? token.substring(0, 10) + "..." : "sin token");
-      
-      if (token) {
-        console.log("Enviando logout con token al endpoint /api/auth/logout/");
-        await apiLogout();
-      }
-      
-      console.log("✅ Logout exitoso");
+      console.warn("[auth] error en logout:", e);
     } finally {
+      clearSession();
       setUser(null);
-      if (typeof window !== "undefined") {
-        window.location.replace("/");
-      }
     }
   };
 
-  // Helpers de permisos
-  const isSuperAdmin = (): boolean => {
-    return user?.roles?.includes("superadmin") ?? false;
-  };
-
-  const isCompanyAdmin = (): boolean => {
-    return (user?.roles?.includes("admin") ?? false) && !!user?.empresa_id;
-  };
-
-  const canAccessAllCompanies = (): boolean => {
-    return isSuperAdmin();
-  };
-
-  const getCompanyScope = (): number | string | null => {
-    return isSuperAdmin() ? null : user?.empresa_id ?? null;
-  };
-
-  const hasCompanyAccess = (empresaId: number | string): boolean => {
-    if (isSuperAdmin()) return true;
-    return String(user?.empresa_id) === String(empresaId);
-  };
-
-  const switchCompany = async (empresaId: number | string): Promise<void> => {
-    if (!isSuperAdmin()) {
-      throw new Error("Solo el superadmin puede cambiar de empresa");
+  const register = async (payload: RegisterInput) => {
+    const res = await apiRegister(payload);
+    if (res.token && res.user) {
+      await persistSession(res.token, res.user);
+      setUser(res.user);
     }
-    
-    try {
-      // Aquí podrías hacer una llamada al backend para cambiar contexto
-      // await http.post("/api/switch-company/", { empresa_id: empresaId });
-      
-      // Por ahora, solo actualizar localStorage
-      localStorage.setItem("auth.current_company_id", String(empresaId));
-      
-      // Recargar la página para aplicar cambios
-      window.location.reload();
-    } catch (error) {
-      console.error("Error cambiando de empresa:", error);
-      throw error;
-    }
+    return res;
   };
 
-  const value = useMemo<AuthCtx>(
-    () => ({ 
-      user, 
-      loading, 
-      login, 
-      register, 
-      registerCompanyAndUser, 
+  const registerCompanyAndUser = async (payload: unknown) => {
+    const res = await apiRegisterCompanyAndUser(payload as CompanyRegisterPayload);
+    if (res.token && res.user) {
+      await persistSession(res.token, res.user as AuthUser);
+      setUser(res.user as AuthUser);
+    }
+    return res;
+  };
+
+  const ctxValue: AuthCtx = useMemo(
+    () => ({
+      user,
+      loading,
+      login: (email: string, password: string) => login({ email, password }),
       logout,
-      isSuperAdmin,
-      isCompanyAdmin,
-      canAccessAllCompanies,
-      getCompanyScope,
-      hasCompanyAccess,
-      switchCompany: isSuperAdmin() ? switchCompany : undefined
+      register: (payload: RegisterInput) => register(payload),
+      registerCompanyAndUser: (payload: {
+        razon_social: string;
+        email_contacto: string;
+        nombre_comercial: string;
+        imagen_url_empresa: string;
+        username: string;
+        password: string;
+        first_name: string;
+        last_name: string;
+        email: string;
+        imagen_url_perfil: string;
+      }) => registerCompanyAndUser(payload),
+      isSuperAdmin: () => !!user?.roles?.includes("superadmin"),
+      isCompanyAdmin: () => !!user?.roles?.includes("admin") && !!user?.empresa_id,
+      canAccessAllCompanies: () => !!user?.roles?.includes("superadmin") || !!user?.permissions?.includes("*"),
+      getCompanyScope: () => user?.empresa_id ?? null,
+      hasCompanyAccess: (empresaId: number | string | null | undefined) => {
+        if (!empresaId) return false;
+        // Superadmin tiene acceso a todas
+        if (user?.roles?.includes("superadmin")) return true;
+        // Mismo empresa_id
+        return String(user?.empresa_id) === String(empresaId);
+      },
     }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [user, loading]
   );
 
-  return React.createElement(Ctx.Provider, { value }, children as React.ReactNode);
+  return React.createElement(Ctx.Provider, { value: ctxValue }, children);
 };
 
-export const useAuth = (): AuthCtx => {
+export function useAuth(): AuthCtx {
   const ctx = useContext(Ctx);
-  if (!ctx) throw new Error("useAuth debe usarse dentro de <AuthProvider>");
+  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
-};
-
-// Normaliza org_roles del backend
-function parseOrgRoles(raw: unknown): import("./types").OrgRolesMap | undefined {
-  if (!raw || typeof raw !== "object") return undefined;
-  const obj = raw as Record<string, unknown>;
-  const out: import("./types").OrgRolesMap = {};
-  for (const [k, v] of Object.entries(obj)) {
-    if (typeof v !== "string") continue;
-    const s = v.toLowerCase();
-    if (s.includes("admin")) out[k] = "administrador";
-    else if (s.includes("geren") || s.includes("manager")) out[k] = "gerente";
-    else if (s.includes("cont")) out[k] = "contador";
-    else if (s.includes("almac") || s.includes("store") || s.includes("stock")) out[k] = "almacenista";
-    else out[k] = "vendedor";
-  }
-  return Object.keys(out).length ? out : undefined;
 }

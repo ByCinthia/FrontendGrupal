@@ -1,52 +1,54 @@
 // modules/dashboard/dashboard.tsx
 import React from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import Sidebar from "../../shared/layout/Sidebar";
-import Topbar from "../../shared/layout/Topbar";
+import SharedHeader from "../../shared/layout/SharedHeader";
 import { useAuth } from "../auth/service";
-import "../../styles/dashboard.css"; // usar estilos del dashboard (si prefieres landing.css, cámbialo aquí)
+import "../../styles/unified-app.css";
 
 const DashboardLayout: React.FC = () => {
   const { user } = useAuth();
+  const location = useLocation();
 
-  const getCompanyName = () => {
-    return user?.empresa_nombre || "WF Finanzas";
+  const getUserDisplay = () => {
+    if (user?.nombre_completo?.trim()) return user.nombre_completo;
+    if (user?.username?.trim()) return user.username;
+    if (user?.email && user.email.includes("@")) return user.email.split("@")[0];
+    return "Usuario";
   };
+
+  const userDisplay = getUserDisplay();
 
   return (
     <div className="app-shell">
-      <Sidebar brand="WF Finanzas" collapseOnNavigate={false} />
+      <Sidebar brand="WF Finanzas" />
 
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: "100vh" }}>
-        <Topbar />
-        
-        {/* Header con nombre de empresa */}
-        <div style={{ 
-          padding: "16px 24px", 
-          borderBottom: "1px solid #e5e7eb",
-          background: "linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%)"
-        }}>
-          <h1 style={{ 
-            margin: 0, 
-            fontSize: "24px", 
-            fontWeight: "700", 
-            color: "#1e293b",
-            display: "flex",
-            alignItems: "center",
-            gap: "8px"
-          }}>
-            🏢 {getCompanyName()}
-          </h1>
-          <p style={{ 
-            margin: "4px 0 0", 
-            color: "#64748b", 
-            fontSize: "14px" 
-          }}>
-            Panel de Control - {user?.roles?.includes("superadmin") ? "Vista Global" : "Vista Empresa"}
-          </p>
-        </div>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+        {/* SharedHeader: empresa + avatar — se muestra en todas las vistas */}
+        <SharedHeader />
 
-        <main className="content" style={{ padding: 16 }}>
+        {/* Header específico del dashboard (index "/app") */}
+        {location.pathname === "/app" && (
+          <header className="dashboard__header dashboard__header--dark">
+            <div className="dashboard__header-inner">
+              <div className="dashboard__greeting">
+                <h1 className="dashboard__title">¡Bienvenido, {userDisplay}!</h1>
+                <p className="dashboard__subtitle">Aquí puedes gestionar usuarios, ver reportes y administrar créditos.</p>
+
+                <ul className="dashboard__features" aria-label="Características principales">
+                  <li>• Panel con métricas en tiempo real</li>
+                  <li>• Gestión de usuarios y permisos</li>
+                  <li>• Control y solicitud de créditos</li>
+                  <li>• Reportes exportables</li>
+                </ul>
+              </div>
+
+              <div className="dashboard__header-right-placeholder" aria-hidden />
+            </div>
+          </header>
+        )}
+
+        <main className="content" style={{ paddingTop: 0 }}>
           <Outlet />
         </main>
       </div>

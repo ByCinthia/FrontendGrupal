@@ -21,7 +21,7 @@ html, body {
   width: 100%;
            /* evita scroll lateral global */
   background: radial-gradient(80% 120% at 50% 10%, #0b1220 0%, #0f172a 60%, #0a0f1f 100%);
-  color: var(--text, #e2e8f0);
+  color: var(--text, rgb(17, 55, 106));
 }
 
 /* Sidebar pegajoso en desktop para que el contenido scrollee pero el menú no */
@@ -99,30 +99,45 @@ html, body {
   border-color: rgba(91,134,229,.35);
 }
 
-/* Contenido: scrollea solo esta área, no la página completa */
+/* Contenido: tarjeta central con brillo tenue */
 .content {
-  min-width: 0;          /* evita overflow de grid cuando hay elementos grandes */
-  padding: 24px 28px;
-  overflow: auto;        /* scroll vertical si el contenido es largo */
-  padding-left: max(24px, env(safe-area-inset-left));
-  padding-right: max(28px, env(safe-area-inset-right));
+  padding: 20px;
+  max-width: 1200px;
+  margin: 18px auto;
+  width: calc(100% - 48px);
+  /* fondo translúcido blanco suave (glass) */
+  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.06);
+  backdrop-filter: blur(8px) saturate(1.05);
+  -webkit-backdrop-filter: blur(8px) saturate(1.05);
+  box-shadow: 0 12px 40px rgba(2,6,23,0.55), inset 0 1px 0 rgba(255,255,255,0.03);
+   min-height: 420px;
 }
 
-/* Tipografía y tarjetas */
-.page h1 { margin: 0 0 8px; }
-.page .muted { color: #94a3b8; margin-bottom: 18px; }
-
-/* Cards fluidas: responden al ancho disponible */
-.cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); /* 🔥 responsivo */
-  gap: 12px;
-}
-.card {
-  background: #0b1324; 
-  border: 1px solid rgba(148,163,184,.16); 
-  border-radius: 14px;
+/* Quick cards / cards: más oscuro + glow en hover */
+.card, .quick-card {
+  /* cards translúcidas con borde blanco tenue */
+  background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.018));
+  border: 1px solid rgba(255,255,255,0.06);
   padding: 16px;
+  border-radius: 10px;
+  color: #e6eef8;
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s;
+}
+.card:hover, .quick-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 22px 56px rgba(2,6,23,0.65), 0 6px 18px rgba(91,134,229,0.06);
+  border-color: rgba(91,134,229,0.14);
+}
+
+/* Card de datos (tabla, listados, etc.) mantener translúcido */
+.card.card--data {
+  padding: 0;
+  overflow: hidden;
+  box-shadow: 0 6px 18px rgba(2,6,23,0.45);
+  background: linear-gradient(180deg, rgba(255,255,255,0.028), rgba(255,255,255,0.016));
+  border: 1px solid rgba(255,255,255,0.05);
 }
 
 /* Responsive */
@@ -153,10 +168,11 @@ html, body {
 
 /* Card de datos (tabla, listados, etc.) */
 .card.card--data {
-  /* hereda tu .card base */
   padding: 0; /* el contenido se secciona por header/body/footer */
   overflow: hidden;
-  box-shadow: 0 1px 2px rgba(0,0,0,.25), 0 6px 18px rgba(0,0,0,.18);
+  box-shadow: 0 6px 18px rgba(2,6,23,0.45);
+  background: linear-gradient(180deg, rgba(255,255,255,0.028), rgba(255,255,255,0.016));
+  border: 1px solid rgba(255,255,255,0.05);
 }
 
 /* Footer de card (para paginador, métricas, etc.) */

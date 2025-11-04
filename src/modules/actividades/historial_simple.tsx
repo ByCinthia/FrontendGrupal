@@ -1,6 +1,8 @@
 // src/modules/actividades/historial_simple.tsx
 import React, { useState, useEffect } from "react";
 import "../../styles/dashboard.css";
+import { RequireAuth } from "../../shared/api/guards";
+import { useAuth } from "../auth/service";
 
 interface ActivityItem {
   id: string;
@@ -12,13 +14,39 @@ interface ActivityItem {
 }
 
 const HistorialActividadesPage: React.FC = () => {
+  const { user } = useAuth();
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [filter, setFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState<string>("");
 
+  // Verificar si es administrador
+  const isAdmin = user?.roles?.includes("admin") || user?.roles?.includes("superadmin");
+
   useEffect(() => {
-    loadActivities();
-  }, []);
+    if (isAdmin) {
+      loadActivities();
+    }
+  }, [isAdmin]);
+
+  // Si no es admin, mostrar acceso denegado
+  if (!isAdmin) {
+    return (
+      <RequireAuth>
+        <section className="page">
+          <div className="card" style={{ textAlign: "center", padding: "40px" }}>
+            <div style={{ fontSize: "64px", marginBottom: "16px" }}>🔒</div>
+            <h2 style={{ color: "#dc2626", marginBottom: "8px" }}>Acceso Denegado</h2>
+            <p style={{ color: "#6b7280", marginBottom: "24px" }}>
+              Solo los administradores pueden ver el historial de actividades de los usuarios.
+            </p>
+            <p style={{ fontSize: "14px", color: "#9ca3af" }}>
+              Tu rol actual: {user?.roles?.join(", ") || "Usuario"}
+            </p>
+          </div>
+        </section>
+      </RequireAuth>
+    );
+  }
 
   const loadActivities = () => {
     // Cargar desde localStorage o datos de ejemplo
@@ -27,13 +55,13 @@ const HistorialActividadesPage: React.FC = () => {
     if (existingLogs) {
       try {
         const logs = JSON.parse(existingLogs);
-        const formattedActivities = logs.map((log: any, index: number) => ({
-          id: log.id || `activity_${index}`,
-          user: log.user || "Usuario",
-          action: log.action || "unknown_action",
-          timestamp: log.timestamp || new Date().toISOString(),
-          details: log.details || "Sin detalles",
-          type: getActionType(log.action)
+        const formattedActivities = logs.map((log: Record<string, unknown>, index: number) => ({
+          id: log.id ? String(log.id) : `activity_${index}`,
+          user: log.user ? String(log.user) : "Usuario",
+          action: log.action ? String(log.action) : "unknown_action",
+          timestamp: log.timestamp ? String(log.timestamp) : new Date().toISOString(),
+          details: log.details ? String(log.details) : "Sin detalles",
+          type: getActionType(log.action ? String(log.action) : "")
         }));
         setActivities(formattedActivities);
       } catch (error) {
@@ -172,174 +200,197 @@ const HistorialActividadesPage: React.FC = () => {
   });
 
   return (
-    <section className="page">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
-        <h1 className="ui-title">📋 Historial de Actividades</h1>
-        <button 
-          onClick={loadActivities}
-          className="ui-btn ui-btn--ghost"
-        >
-          🔄 Actualizar
-        </button>
-      </div>
-
-      {/* Filtros */}
-      <div className="card" style={{ marginBottom: "24px" }}>
-        <div style={{ display: "flex", gap: "16px", alignItems: "center", flexWrap: "wrap" }}>
-          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-            <label style={{ fontWeight: "bold", color: "#374151" }}>Filtrar por:</label>
-            <select 
-              value={filter} 
-              onChange={(e) => setFilter(e.target.value)}
-              style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db" }}
-            >
-              <option value="all">Todas las actividades</option>
-              <option value="create">✅ Creaciones</option>
-              <option value="update">✏️ Modificaciones</option>
-              <option value="delete">🗑️ Eliminaciones</option>
-              <option value="export">📤 Exportaciones</option>
-              <option value="view">👁️ Visualizaciones</option>
-            </select>
-          </div>
-          
-          <div style={{ display: "flex", gap: "8px", alignItems: "center", flex: 1, maxWidth: "300px" }}>
-            <label style={{ fontWeight: "bold", color: "#374151" }}>Buscar:</label>
-            <input
-              type="text"
-              placeholder="Usuario, acción o detalles..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ 
-                flex: 1,
-                padding: "8px 12px", 
-                borderRadius: "6px", 
-                border: "1px solid #d1d5db" 
-              }}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Lista de Actividades */}
-      <div className="card">
-        <h3 style={{ marginBottom: "20px" }}>
-          Actividades Recientes ({filteredActivities.length})
-        </h3>
-        
-        {filteredActivities.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "40px", color: "#6b7280" }}>
-            <div style={{ fontSize: "48px", marginBottom: "16px" }}>📝</div>
-            <p>No se encontraron actividades</p>
-            <p style={{ fontSize: "14px" }}>
-              {filter !== "all" || searchTerm ? "Prueba ajustando los filtros" : "Las actividades aparecerán aquí cuando los usuarios interactúen con el sistema"}
+    <RequireAuth>
+      <section className="page">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
+          <div>
+            <h1 className="ui-title">📋 Historial de Actividades</h1>
+            <p style={{ color: "#6b7280", margin: "4px 0 0 0" }}>
+              Monitoreo de acciones realizadas por usuarios de la empresa
             </p>
           </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            {filteredActivities.map((activity, index) => (
-              <div 
-                key={activity.id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  padding: "16px",
-                  borderBottom: index < filteredActivities.length - 1 ? "1px solid #f3f4f6" : "none",
-                  borderRadius: index === 0 ? "8px 8px 0 0" : index === filteredActivities.length - 1 ? "0 0 8px 8px" : "0"
-                }}
+          <button 
+            onClick={loadActivities}
+            className="ui-btn ui-btn--ghost"
+          >
+            🔄 Actualizar
+          </button>
+        </div>
+
+        {/* Badge de rol */}
+        <div style={{ 
+          display: "inline-flex", 
+          alignItems: "center", 
+          gap: "8px", 
+          backgroundColor: "#dcfdf7", 
+          color: "#059669", 
+          padding: "6px 12px", 
+          borderRadius: "8px", 
+          fontSize: "12px", 
+          fontWeight: "600",
+          marginBottom: "24px"
+        }}>
+          👔 Acceso de Administrador: {user?.roles?.includes("superadmin") ? "Super Admin" : "Admin"}
+        </div>
+
+        {/* Filtros */}
+        <div className="card" style={{ marginBottom: "24px" }}>
+          <div style={{ display: "flex", gap: "16px", alignItems: "center", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <label style={{ fontWeight: "bold", color: "#374151" }}>Filtrar por:</label>
+              <select 
+                value={filter} 
+                onChange={(e) => setFilter(e.target.value)}
+                style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db" }}
               >
-                <div style={{
-                  width: "40px",
-                  height: "40px",
-                  borderRadius: "50%",
-                  backgroundColor: getActionColor(activity.type),
-                  color: "white",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "16px",
-                  marginRight: "16px",
-                  flexShrink: 0
-                }}>
-                  {getActionIcon(activity.type)}
-                </div>
-                
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: "4px" }}>
-                    <h4 style={{ 
-                      margin: 0, 
-                      color: "#1f2937",
-                      fontSize: "14px",
-                      fontWeight: "600"
-                    }}>
-                      {getActionDisplayName(activity.action)}
-                    </h4>
-                    <span style={{ 
-                      fontSize: "12px", 
-                      color: "#6b7280",
-                      flexShrink: 0,
-                      marginLeft: "12px"
-                    }}>
-                      {formatTimestamp(activity.timestamp)}
-                    </span>
+                <option value="all">Todas las actividades</option>
+                <option value="create">✅ Creaciones</option>
+                <option value="update">✏️ Modificaciones</option>
+                <option value="delete">🗑️ Eliminaciones</option>
+                <option value="export">📤 Exportaciones</option>
+                <option value="view">👁️ Visualizaciones</option>
+              </select>
+            </div>
+            
+            <div style={{ display: "flex", gap: "8px", alignItems: "center", flex: 1, maxWidth: "300px" }}>
+              <label style={{ fontWeight: "bold", color: "#374151" }}>Buscar:</label>
+              <input
+                type="text"
+                placeholder="Usuario, acción o detalles..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{ 
+                  flex: 1,
+                  padding: "8px 12px", 
+                  borderRadius: "6px", 
+                  border: "1px solid #d1d5db" 
+                }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Lista de Actividades */}
+        <div className="card">
+          <h3 style={{ marginBottom: "20px" }}>
+            Actividades Recientes ({filteredActivities.length})
+          </h3>
+          
+          {filteredActivities.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "40px", color: "#6b7280" }}>
+              <div style={{ fontSize: "48px", marginBottom: "16px" }}>📝</div>
+              <p>No se encontraron actividades</p>
+              <p style={{ fontSize: "14px" }}>
+                {filter !== "all" || searchTerm ? "Prueba ajustando los filtros" : "Las actividades aparecerán aquí cuando los usuarios interactúen con el sistema"}
+              </p>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              {filteredActivities.map((activity, index) => (
+                <div 
+                  key={activity.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    padding: "16px",
+                    borderBottom: index < filteredActivities.length - 1 ? "1px solid #f3f4f6" : "none",
+                    borderRadius: index === 0 ? "8px 8px 0 0" : index === filteredActivities.length - 1 ? "0 0 8px 8px" : "0"
+                  }}
+                >
+                  <div style={{
+                    width: "40px",
+                    height: "40px",
+                    borderRadius: "50%",
+                    backgroundColor: getActionColor(activity.type),
+                    color: "white",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "16px",
+                    marginRight: "16px",
+                    flexShrink: 0
+                  }}>
+                    {getActionIcon(activity.type)}
                   </div>
                   
-                  <p style={{ 
-                    margin: "0 0 4px 0", 
-                    color: "#4b5563",
-                    fontSize: "13px",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap"
-                  }}>
-                    {activity.details}
-                  </p>
-                  
-                  <p style={{ 
-                    margin: 0, 
-                    color: "#9ca3af",
-                    fontSize: "12px"
-                  }}>
-                    Por: <strong>{activity.user}</strong>
-                  </p>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: "4px" }}>
+                      <h4 style={{ 
+                        margin: 0, 
+                        color: "#1f2937",
+                        fontSize: "14px",
+                        fontWeight: "600"
+                      }}>
+                        {getActionDisplayName(activity.action)}
+                      </h4>
+                      <span style={{ 
+                        fontSize: "12px", 
+                        color: "#6b7280",
+                        flexShrink: 0,
+                        marginLeft: "12px"
+                      }}>
+                        {formatTimestamp(activity.timestamp)}
+                      </span>
+                    </div>
+                    
+                    <p style={{ 
+                      margin: "0 0 4px 0", 
+                      color: "#4b5563",
+                      fontSize: "13px",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap"
+                    }}>
+                      {activity.details}
+                    </p>
+                    
+                    <p style={{ 
+                      margin: 0, 
+                      color: "#9ca3af",
+                      fontSize: "12px"
+                    }}>
+                      Por: <strong>{activity.user}</strong>
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Estadísticas rápidas */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "16px", marginTop: "24px" }}>
+          {["create", "update", "delete", "export", "view"].map(type => {
+            const count = activities.filter(a => a.type === type).length;
+            return (
+              <div 
+                key={type}
+                className="card"
+                style={{ 
+                  textAlign: "center", 
+                  padding: "16px",
+                  backgroundColor: count > 0 ? "#f8fafc" : "#ffffff"
+                }}
+              >
+                <div style={{ fontSize: "24px", marginBottom: "8px" }}>
+                  {getActionIcon(type)}
+                </div>
+                <div style={{ fontSize: "20px", fontWeight: "bold", color: getActionColor(type) }}>
+                  {count}
+                </div>
+                <div style={{ fontSize: "12px", color: "#6b7280", textTransform: "capitalize" }}>
+                  {type === "create" && "Creaciones"}
+                  {type === "update" && "Modificaciones"}
+                  {type === "delete" && "Eliminaciones"}
+                  {type === "export" && "Exportaciones"}
+                  {type === "view" && "Visualizaciones"}
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Estadísticas rápidas */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "16px", marginTop: "24px" }}>
-        {["create", "update", "delete", "export", "view"].map(type => {
-          const count = activities.filter(a => a.type === type).length;
-          return (
-            <div 
-              key={type}
-              className="card"
-              style={{ 
-                textAlign: "center", 
-                padding: "16px",
-                backgroundColor: count > 0 ? "#f8fafc" : "#ffffff"
-              }}
-            >
-              <div style={{ fontSize: "24px", marginBottom: "8px" }}>
-                {getActionIcon(type)}
-              </div>
-              <div style={{ fontSize: "20px", fontWeight: "bold", color: getActionColor(type) }}>
-                {count}
-              </div>
-              <div style={{ fontSize: "12px", color: "#6b7280", textTransform: "capitalize" }}>
-                {type === "create" && "Creaciones"}
-                {type === "update" && "Modificaciones"}
-                {type === "delete" && "Eliminaciones"}
-                {type === "export" && "Exportaciones"}
-                {type === "view" && "Visualizaciones"}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </section>
+            );
+          })}
+        </div>
+      </section>
+    </RequireAuth>
   );
 };
 

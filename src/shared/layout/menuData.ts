@@ -5,7 +5,7 @@ export type MenuItem = {
   label: string;
   icon?: string;
   exact?: boolean;
-  roles?: string[]; // opcional: roles permitidos
+  roles?: string[];
 };
 
 export function getMenuForUser(user: AuthUser | null): MenuItem[] {
@@ -13,26 +13,34 @@ export function getMenuForUser(user: AuthUser | null): MenuItem[] {
   const hasRole = (r: string) => roles.includes(r);
 
   const common: MenuItem[] = [
-    { path: "/", label: "Dashboard", icon: "🏠", exact: true },
-    { path: "/reportes", label: "Reportes", icon: "📈" },
-    { path: "/ingresos", label: "Ingresos", icon: "💹" },
-    { path: "/pagos", label: "Pagos", icon: "💳" },
-    // Personalización disponible para todos los roles/menus
-    { path: "/personalizacion", label: "Personalización", icon: "🎨" },
+    { path: "/app", label: "Dashboard", icon: "🏠", exact: true },
+    { path: "/app/reportes", label: "Reportes", icon: "📈" },
+    { path: "/app/creditos", label: "Créditos", icon: "💳" },
+    { path: "/app/ingresos", label: "Ingresos", icon: "💹" },
+    { path: "/app/pagos", label: "Pagos", icon: "💳" },
+    { path: "/app/personalizacion", label: "Personalización", icon: "🎨" },
   ];
 
   const adminOnly: MenuItem[] = [
-    { path: "/usuarios", label: "Usuarios", icon: "👥" },
+    { path: "/app/usuarios", label: "Usuarios", icon: "👥" },
+    { path: "/app/actividades", label: "Actividades", icon: "📋" },
+    { path: "/app/creditos/tipos", label: "Tipos de Crédito", icon: "💳" },
   ];
 
   const superAdminOnly: MenuItem[] = [
-    { path: "/empresas", label: "Empresas", icon: "🏢" },
+    { path: "/app/empresas", label: "Empresas", icon: "🏢" },
+    { path: "/app/auditoria", label: "Auditoría", icon: "🔍" },
   ];
 
   let items = [...common];
 
-  if (hasRole("admin")) items = [...items, ...adminOnly];
-  if (hasRole("superadmin")) items = [...items, ...adminOnly, ...superAdminOnly];
+  if (hasRole("admin") || hasRole("superadmin")) {
+    items = [...items, ...adminOnly];
+  }
+  
+  if (hasRole("superadmin")) {
+    items = [...items, ...superAdminOnly];
+  }
 
   return items;
 }

@@ -1,19 +1,26 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { createCredit, listClients, listCreditTypes } from "./service";
-import type { CreateCreditInput } from "./service"; // importar desde service.ts
-import type { Client, CreditType, Moneda, Frecuencia, SistemaAmortizacion } from "./types";
+import { createCredit } from "./service";
+import type { CreateCreditInput } from "./service";
+import type { Moneda } from "./types";
+import { listClients } from "./clients/service";
+import type { Cliente } from "./clients/types";
 import "../../styles/dashboard.css";
 
-const MONEDAS: Moneda[] = ["USD", "EUR", "PEN", "CLP", "ARS"];
-const FRECUENCIAS: Frecuencia[] = ["MENSUAL", "QUINCENAL", "SEMANAL"];
-const SISTEMAS: SistemaAmortizacion[] = ["FRANCES", "ALEMAN", "AMERICANO"];
+const MONEDAS: Moneda[] = ["USD", "EUR", "PEN", "CLP", "ARS", "BOB"];
+const FRECUENCIAS = ["MENSUAL", "QUINCENAL", "SEMANAL"];
+const SISTEMAS = ["FRANCES", "ALEMAN", "AMERICANO"];
 
-export default function SolicitarCredito(): React.JSX.Element {
+// Clientes (para seleccionar al solicitar)
+const SolicitarCreditoForm: React.FC = () => {
   const navigate = useNavigate();
   
-  const [clientes, setClientes] = useState<Client[]>([]);
-  const [tipos, setTipos] = useState<CreditType[]>([]);
+  // Estados para clientes
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [loadingClientes, setLoadingClientes] = useState(true);
+  const [clientesError, setClientesError] = useState<string | null>(null);
+
+  // Estados del formulario principal
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -22,7 +29,7 @@ export default function SolicitarCredito(): React.JSX.Element {
   const [form, setForm] = useState<CreateCreditInput>({
     cliente_id: "",
     producto: "",
-    moneda: "USD",
+    moneda: "BOB",
     monto: 10000,
     tasa_anual: 12,
     plazo_meses: 12,
@@ -42,26 +49,21 @@ export default function SolicitarCredito(): React.JSX.Element {
 
   useEffect(() => {
     void (async () => {
+      setLoadingClientes(true);
+      setClientesError(null);
+      
       try {
-        const [clientesData, tiposData] = await Promise.all([
-          listClients(),
-          listCreditTypes()
-        ]);
-        setClientes(clientesData);
-        setTipos(tiposData);
+        const list = await listClients();
+        setClientes(list);
         
-        // Auto-seleccionar primer tipo si existe
-        if (tiposData.length > 0) {
-          const primerTipo = tiposData[0];
-          setForm((prev: CreateCreditInput) => ({
-            ...prev,
-            producto: primerTipo.nombre,
-            tasa_anual: primerTipo.tasa_interes_anual,
-            plazo_meses: primerTipo.plazo_meses
-          }));
+        // Auto-seleccionar el primer cliente si existe
+        if (list.length > 0) {
+          setForm(prev => ({ ...prev, cliente_id: String(list[0].id) }));
         }
-      } catch {
-        setError("Error al cargar datos iniciales");
+      } catch (err) {
+        setClientesError((err as Error).message);
+      } finally {
+        setLoadingClientes(false);
       }
     })();
   }, []);
@@ -70,41 +72,33 @@ export default function SolicitarCredito(): React.JSX.Element {
     setForm((prev: CreateCreditInput) => ({ ...prev, [field]: value }));
   };
 
-  const handleTipoChange = (tipoId: string) => {
-    const tipo = tipos.find(t => t.id.toString() === tipoId);
-    if (tipo) {
-      setForm((prev: CreateCreditInput) => ({
-        ...prev,
-        producto: tipo.nombre,
-        tasa_anual: tipo.tasa_interes_anual,
-        plazo_meses: tipo.plazo_meses
-      }));
-    }
-  };
-
   const crearNuevoCliente = async () => {
     if (!nuevoCliente.nombre.trim() || !nuevoCliente.documento.trim()) {
       setError("Nombre y documento son obligatorios");
       return;
     }
 
+    setLoading(true);
     try {
-      const { createClient } = await import("./service");
-      const clienteCreado = await createClient({
+      // Simulación de crear cliente (ajustar según tu API)
+      const clienteCreado: Cliente = {
+        id: Date.now(), // ID temporal
         nombre: nuevoCliente.nombre,
         apellido: nuevoCliente.apellido,
-        documento: nuevoCliente.documento,
-        email: nuevoCliente.email || null,
-        telefono: nuevoCliente.telefono || null
-      });
+        ci: nuevoCliente.documento,
+        telefono: nuevoCliente.telefono,
+        fecha_registro: new Date().toISOString()
+      };
       
-      setClientes((prev: Client[]) => [...prev, clienteCreado]);
-      setForm((prev: CreateCreditInput) => ({ ...prev, cliente_id: clienteCreado.id }));
+      setClientes((prev: Cliente[]) => [...prev, clienteCreado]);
+      setForm((prev: CreateCreditInput) => ({ ...prev, cliente_id: String(clienteCreado.id) }));
       setMostrarFormCliente(false);
       setNuevoCliente({ nombre: "", apellido: "", documento: "", email: "", telefono: "" });
       setSuccess("Cliente creado exitosamente");
     } catch {
       setError("Error al crear cliente");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -121,7 +115,7 @@ export default function SolicitarCredito(): React.JSX.Element {
     setLoading(true);
     try {
       const credito = await createCredit(form);
-      setSuccess(`Solicitud de crédito creada exitosamente. Código: ${credito.codigo}`);
+      setSuccess(`Solicitud de crédito creada exitosamente. ID: ${credito.id || 'N/A'}`);
       setTimeout(() => navigate("/app/creditos"), 2000);
     } catch {
       setError("Error al crear la solicitud de crédito");
@@ -140,14 +134,27 @@ export default function SolicitarCredito(): React.JSX.Element {
       </header>
 
       {error && (
-        <div className="ui-alert ui-alert--danger" style={{ marginBottom: 16 }}>
+        <div className="ui-alert ui-alert--danger" style={{ marginBottom: "16px" }}>
           {error}
         </div>
       )}
 
       {success && (
-        <div className="ui-alert ui-alert--success" style={{ marginBottom: 16 }}>
+        <div className="ui-alert ui-alert--success" style={{ marginBottom: "16px" }}>
           {success}
+        </div>
+      )}
+
+      {/* Mostrar estado de carga de clientes */}
+      {loadingClientes && (
+        <div className="ui-alert ui-alert--info" style={{ marginBottom: "16px" }}>
+          Cargando clientes...
+        </div>
+      )}
+
+      {clientesError && (
+        <div className="ui-alert ui-alert--warning" style={{ marginBottom: "16px" }}>
+          Error al cargar clientes: {clientesError}
         </div>
       )}
 
@@ -164,11 +171,12 @@ export default function SolicitarCredito(): React.JSX.Element {
                   className="ui-select"
                   value={form.cliente_id}
                   onChange={(e) => handleFormChange("cliente_id", e.target.value)}
+                  disabled={loadingClientes}
                 >
                   <option value="">Seleccionar cliente...</option>
                   {clientes.map(cliente => (
                     <option key={cliente.id} value={cliente.id}>
-                      {cliente.nombre} {cliente.apellido} - {cliente.documento}
+                      {cliente.nombre} {cliente.apellido ? ` ${cliente.apellido}` : ""} - {cliente.ci || 'Sin CI'}
                     </option>
                   ))}
                 </select>
@@ -216,7 +224,7 @@ export default function SolicitarCredito(): React.JSX.Element {
                       className="ui-input"
                       value={nuevoCliente.documento}
                       onChange={(e) => setNuevoCliente(prev => ({ ...prev, documento: e.target.value }))}
-                      placeholder="DNI, RUC, etc."
+                      placeholder="CI, RUC, etc."
                     />
                   </div>
                   
@@ -237,7 +245,7 @@ export default function SolicitarCredito(): React.JSX.Element {
                       className="ui-input"
                       value={nuevoCliente.telefono}
                       onChange={(e) => setNuevoCliente(prev => ({ ...prev, telefono: e.target.value }))}
-                      placeholder="+51 999 999 999"
+                      placeholder="+591 999 999 999"
                     />
                   </div>
                 </div>
@@ -246,8 +254,9 @@ export default function SolicitarCredito(): React.JSX.Element {
                   type="button" 
                   className="ui-btn ui-btn--primary"
                   onClick={crearNuevoCliente}
+                  disabled={loading}
                 >
-                  Crear cliente
+                  {loading ? "Creando..." : "Crear cliente"}
                 </button>
               </div>
             )}
@@ -259,27 +268,13 @@ export default function SolicitarCredito(): React.JSX.Element {
             
             <div className="ui-form__row">
               <div className="ui-form__field">
-                <label className="ui-label">Tipo de crédito</label>
-                <select 
-                  className="ui-select"
-                  onChange={(e) => handleTipoChange(e.target.value)}
-                >
-                  <option value="">Seleccionar tipo...</option>
-                  {tipos.map(tipo => (
-                    <option key={tipo.id} value={tipo.id}>
-                      {tipo.nombre} - {tipo.tasa_interes_anual}% ({tipo.plazo_meses} meses)
-                    </option>
-                  ))}
-                </select>
-              </div>
-              
-              <div className="ui-form__field">
-                <label className="ui-label">Producto</label>
+                <label className="ui-label">Producto *</label>
                 <input 
                   className="ui-input"
                   value={form.producto}
                   onChange={(e) => handleFormChange("producto", e.target.value)}
-                  placeholder="Nombre del producto"
+                  placeholder="Nombre del producto (ej: Crédito Personal)"
+                  required
                 />
               </div>
             </div>
@@ -368,12 +363,40 @@ export default function SolicitarCredito(): React.JSX.Element {
             </div>
           </div>
 
+          {/* Simulación de cuota */}
+          {form.monto > 0 && form.plazo_meses > 0 && form.tasa_anual > 0 && (
+            <div className="ui-form__section">
+              <h3 className="ui-form__section-title">Simulación</h3>
+              <div style={{ 
+                padding: "16px", 
+                backgroundColor: "#f8fafc", 
+                borderRadius: "8px",
+                border: "1px solid #e2e8f0"
+              }}>
+                <div className="ui-form__row">
+                  <div className="ui-form__field">
+                    <strong>Cuota estimada:</strong><br />
+                    <span style={{ color: "#3ab5ff", fontSize: "18px" }}>
+                      {form.moneda} {(form.monto * (form.tasa_anual / 100 / 12) * Math.pow(1 + (form.tasa_anual / 100 / 12), form.plazo_meses) / (Math.pow(1 + (form.tasa_anual / 100 / 12), form.plazo_meses) - 1)).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="ui-form__field">
+                    <strong>Total a pagar:</strong><br />
+                    <span style={{ color: "#374151", fontSize: "18px" }}>
+                      {form.moneda} {(form.monto * (1 + (form.tasa_anual / 100 * form.plazo_meses / 12))).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Botones de acción */}
           <div className="ui-form__actions">
             <button 
               type="submit" 
               className="ui-btn ui-btn--primary"
-              disabled={loading}
+              disabled={loading || !form.cliente_id || !form.producto}
             >
               {loading ? "Creando solicitud..." : "Crear solicitud"}
             </button>
@@ -390,4 +413,6 @@ export default function SolicitarCredito(): React.JSX.Element {
       </div>
     </section>
   );
-}
+};
+
+export default SolicitarCreditoForm;

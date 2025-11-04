@@ -3,6 +3,7 @@ import { Outlet, Link, useLocation } from "react-router-dom";
 import { listCredits, changeStatus } from "./service";
 import type { Credit, CreditStatus, ListCreditsParams, Moneda } from "./types";
 import "../../styles/dashboard.css";
+import { useAuth } from "../auth/service";
 
 const ESTADOS: (CreditStatus | "ALL")[] = [
   "ALL","SOLICITADO","EN_EVALUACION","APROBADO","RECHAZADO","DESEMBOLSADO","EN_MORA","CANCELADO"
@@ -26,8 +27,12 @@ const StatusBadge: React.FC<{ s: CreditStatus }> = ({ s }) => {
 
 const TabNavigation: React.FC = () => {
   const location = useLocation();
+  const { user } = useAuth();
+  const isAdmin = user?.roles?.includes("admin") || user?.roles?.includes("superadmin");
+  
   const isGestion = location.pathname === "/app/creditos";
   const isSolicitar = location.pathname === "/app/creditos/solicitar";
+  const isTipos = location.pathname === "/app/creditos/tipos";
 
   return (
     <nav className="ui-tabs">
@@ -43,6 +48,14 @@ const TabNavigation: React.FC = () => {
       >
         Solicitar crédito
       </Link>
+      {isAdmin && (
+        <Link 
+          to="/app/creditos/tipos" 
+          className={`ui-tab ${isTipos ? "ui-tab--active" : ""}`}
+        >
+          Tipos de crédito
+        </Link>
+      )}
     </nav>
   );
 };
