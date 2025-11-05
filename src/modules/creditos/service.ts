@@ -1,53 +1,54 @@
 import { http } from "../../shared/api/client";
-import {
-  adaptCredit,
-  type Credit,
-  type CreditDTO,
-  type ListCreditsParams,
-  type Page,
-  type Moneda,
-} from "./types";
-import type { Client, CreditType, ClientDocument } from "./types";
+import { listClientes } from "../clientes/service";
+import { listTiposCredito } from "./tipos/service";
+import type { CreateCreditInput, Client, CreditType } from "./types";
 
-/** Formatos paginados comunes */
-interface BackendPage<T> {
-  results?: T[];
-  data?: T[];
-  count?: number;
-  total?: number;
-  page?: number;
-  current_page?: number;
-  page_size?: number;
-  per_page?: number;
+const BASE_URL = "/api/creditos"; // Ajustar según tu backend
+
+// Conectar con el service de clientes real
+export async function listClients(): Promise<Client[]> {
+  try {
+    const response = await listClientes(); // Usar el service existente de clientes
+    // Mapear los datos al formato que espera el formulario de créditos
+    return response.results.map(cliente => ({
+      id: cliente.id!,
+      nombre: cliente.nombre,
+      apellido: cliente.apellido || "",
+      telefono: cliente.telefono
+    }));
+  } catch (error) {
+    console.error("Error loading clients:", error);
+    
+    // Fallback con datos mock si el backend no está disponible
+    if (import.meta.env.DEV) {
+      console.log("🔧 Using mock clients data");
+      return [
+        { id: 1, nombre: "Juan", apellido: "Pérez", telefono: "+591 70123456" },
+        { id: 2, nombre: "María", apellido: "García", telefono: "+591 71234567" },
+        { id: 3, nombre: "Carlos", apellido: "López", telefono: "+591 72345678" },
+        { id: 4, nombre: "Ana", apellido: "Martínez", telefono: "+591 73456789" }
+      ];
+    }
+    
+    throw error;
+  }
 }
 
-const normalizePage = <T,>(
-  raw: BackendPage<T> | T[],
-  page: number,
-  page_size: number
-): { items: T[]; count: number; page: number; page_size: number } => {
-  if (Array.isArray(raw)) return { items: raw, count: raw.length, page, page_size };
-  const items = (raw.results ?? raw.data ?? []) as T[];
-  const count = (raw.count ?? raw.total ?? items.length) as number;
-  const pg = (raw.page ?? raw.current_page ?? page) as number;
-  const ps = (raw.page_size ?? raw.per_page ?? page_size) as number;
-  return { items, count, page: pg, page_size: ps };
-};
-
-
-
-
-/** Listado principal */
-export async function listCredits(params: ListCreditsParams = {}): Promise<Page<Credit>> {
-  const { search, estado = "ALL", moneda = "ALL", desde, hasta, page = 1, page_size = 10 } = params;
-
-  const query: Record<string, string | number> = { page, page_size };
-  if (search && search.trim()) query.search = search.trim();
-  if (estado !== "ALL") query.estado = estado;
-  if (moneda !== "ALL") query.moneda = moneda;
-  if (desde) query.desde = desde;
-  if (hasta) query.hasta = hasta;
-
+// Conectar con el service de tipos de crédito real
+export async function listCreditTypes(): Promise<CreditType[]> {
+  try {
+    const response = await listTiposCredito(); // Usar el service existente de tipos
+    // Mapear los datos al formato que espera el formulario de créditos
+    return response.results.map(tipo => ({
+      id: tipo.id!,
+      nombre: tipo.nombre,
+      descripcion: tipo.descripcion,
+      monto_minimo: tipo.monto_minimo,
+      monto_maximo: tipo.monto_maximo
+    }));
+  } catch (error) {
+    console.error("Error loading credit types:", error);
+    
   const res = await http.get<BackendPage<CreditDTO> | CreditDTO[]>("/api/creditos/", { params: query });
   const normalized = normalizePage<CreditDTO>(res.data, page, page_size);
 
@@ -191,6 +192,30 @@ export async function changeStatusWithValidation(
   // incluir actor en el body para auditoría; esto también evita la advertencia de "actor" sin usar
   const updated = await http.post<CreditDTO>(`/api/creditos/${id}/${action}/`, { actor });
   return adaptCredit(updated.data);
+}
+
+/* ---------- Nueva sección para el endpoint de créditos (Django router) ---------- */
+
+const BASE_URL = "/api/creditos/creditos"; // Coincide con Django router
+
+export async function listCreditos() {
+  try {
+    const response = await http.get(BASE_URL);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching creditos:", error);
+    throw new Error("No se pudieron cargar los créditos");
+  }
+}
+
+export async function createCredito(data: CreateCreditoInput): Promise<Credito> {
+  try {
+    const response = await http.post<Credito>(BASE_URL, data);
+    return response.data;
+  } catch (error) {
+    console.error("Error creating credito:", error);
+    throw new Error("No se pudo crear el crédito");
+  }
 }
 
 /* ---------- Nota ----------

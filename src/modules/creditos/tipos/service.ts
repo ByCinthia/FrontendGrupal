@@ -7,9 +7,41 @@ import type {
   TiposCreditoPage 
 } from "./types";
 
-const BASE_URL = "/api/Creditos/tipo-creditos";
+const BASE_URL = "/api/Creditos/tipo-creditos/"; // ✅ URL correcta con slash final y C mayúscula
 
-/**
+// Eliminar también el código de prueba de múltiples URLs
+export async function createTipoCredito(data: CreateTipoCreditoInput): Promise<TipoCredito> {
+  try {
+    const payload = {
+      nombre: String(data.nombre).trim(),
+      descripcion: String(data.descripcion).trim(),
+      monto_minimo: Number(data.monto_minimo),
+      monto_maximo: Number(data.monto_maximo)
+    };
+    
+    console.log("📤 Enviando tipo credito:", {
+      url: BASE_URL,
+      payload
+    });
+    
+    const response = await http.post<TipoCredito>(BASE_URL, payload);
+    
+    console.log("✅ Tipo crédito creado:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("❌ Error creating tipo credito:", error);
+    
+    // Mostrar detalles del error para debug
+    if (error.response) {
+      console.error("Status:", error.response.status);
+      console.error("Data:", error.response.data);
+    }
+    
+    throw new Error("No se pudo crear el tipo de crédito");
+  }
+}
+
+ /**
  * Referencias / ejemplos
  * HU10 tipos de creditos
  * Endpoint (HTTP CRUD): http://127.0.0.1:8000/api/Creditos/tipo-creditos
@@ -44,22 +76,24 @@ const BASE_URL = "/api/Creditos/tipo-creditos";
 /* Listado con soporte a respuesta paginada o array simple */
 export async function listTiposCredito(params: ListTiposCreditoParams = {}): Promise<TiposCreditoPage> {
   const { search, page = 1, page_size = 10 } = params;
-
   const query: Record<string, string | number> = { page, page_size };
+  
   if (search && search.trim()) {
     query.search = search.trim();
   }
 
   try {
+    console.log("📤 GET", BASE_URL, "params:", query);
     const response = await http.get(BASE_URL, { params: query });
     const data = response.data;
+    
+    console.log("✅ Response:", data);
 
     // Caso: backend devuelve un array simple
     if (Array.isArray(data)) {
-      const results: TipoCredito[] = data;
       return {
-        results,
-        count: results.length,
+        results: data,
+        count: data.length,
         page,
         page_size
       };
@@ -76,7 +110,7 @@ export async function listTiposCredito(params: ListTiposCreditoParams = {}): Pro
       page_size
     };
   } catch (error) {
-    console.error("Error fetching tipos credito:", error);
+    console.error("❌ Error fetching tipos credito:", error);
     throw new Error("No se pudieron cargar los tipos de crédito");
   }
 }
@@ -88,16 +122,6 @@ export async function getTipoCredito(id: number): Promise<TipoCredito> {
   } catch (error) {
     console.error("Error fetching tipo credito:", error);
     throw new Error("No se pudo cargar el tipo de crédito");
-  }
-}
-
-export async function createTipoCredito(data: CreateTipoCreditoInput): Promise<TipoCredito> {
-  try {
-    const response = await http.post<TipoCredito>(BASE_URL, data);
-    return response.data;
-  } catch (error) {
-    console.error("Error creating tipo credito:", error);
-    throw new Error("No se pudo crear el tipo de crédito");
   }
 }
 

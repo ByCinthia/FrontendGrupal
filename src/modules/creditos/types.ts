@@ -161,3 +161,38 @@ export type Frecuencia = "MENSUAL" | "QUINCENAL" | "SEMANAL";
  * Sistema de amortización (según tu diagrama / backend)
  */
 export type SistemaAmortizacion = "FRANCES" | "ALEMAN" | "AMERICANO";
+
+// Tipos basados en el modelo Django Credito
+export type EstadoCredito = 'Pendiente' | 'Aprobado' | 'Rechazado' | 'SOLICITADO' | 'DESENBOLSADO' | 'FINALIZADO';
+
+export type Credito = {
+  id?: number;
+  Monto_Solicitado: string | number;
+  enum_estado: EstadoCredito;
+  Numero_Cuotas: number;
+  Monto_Cuota: string | number;
+  Moneda: string;
+  Tasa_Interes: string | number;
+  Fecha_Aprobacion?: string | null;
+  Fecha_Desembolso?: string | null;
+  Fecha_Finalizacion?: string | null;
+  Monto_Pagar: string | number;
+  empresa: number; // ID de la empresa
+  usuario: number; // ID del usuario
+  cliente: number; // ID del cliente
+  tipo_credito: number; // ID del tipo de crédito
+};
+
+export type CreateCreditoInput = {
+  Monto_Solicitado: number;
+  enum_estado: EstadoCredito;
+  Numero_Cuotas: number;
+  Monto_Cuota: number;
+  Moneda: string;
+  Tasa_Interes: number;
+  Monto_Pagar: number;
+  empresa: number;
+  usuario: number;
+  cliente: number;
+  tipo_credito: number;
+};

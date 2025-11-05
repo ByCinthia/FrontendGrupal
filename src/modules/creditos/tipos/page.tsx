@@ -42,11 +42,8 @@ const TiposCreditoPage: React.FC = () => {
   // Verificar permisos (solo admins pueden gestionar tipos)
   const isAdmin = user?.roles?.includes("admin") || user?.roles?.includes("superadmin");
 
-  useEffect(() => {
-    loadTipos();
-  }, [search, page]);
-
-  const loadTipos = async () => {
+  // Mover loadTipos fuera del useEffect para evitar warning de dependencias
+  const loadTipos = React.useCallback(async () => {
     setLoading(true);
     setError(null);
     
@@ -65,7 +62,11 @@ const TiposCreditoPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [search, page, pageSize]);
+
+  useEffect(() => {
+    loadTipos();
+  }, [loadTipos]);
 
   const handleSearch = (value: string) => {
     setSearch(value);
@@ -88,8 +89,8 @@ const TiposCreditoPage: React.FC = () => {
     setModalData({
       nombre: tipo.nombre,
       descripcion: tipo.descripcion,
-      monto_minimo: tipo.monto_minimo,
-      monto_maximo: tipo.monto_maximo
+      monto_minimo: typeof tipo.monto_minimo === 'string' ? parseFloat(tipo.monto_minimo) : tipo.monto_minimo,
+      monto_maximo: typeof tipo.monto_maximo === 'string' ? parseFloat(tipo.monto_maximo) : tipo.monto_maximo
     });
     setShowModal(true);
   };
@@ -110,6 +111,11 @@ const TiposCreditoPage: React.FC = () => {
     try {
       if (editingTipo) {
         // Actualizar
+        if (!editingTipo.id) {
+          setError("Error: ID del tipo de crédito no disponible");
+          setLoading(false);
+          return;
+        }
         const updateData: UpdateTipoCreditoInput = {
           id: editingTipo.id,
           ...modalData
@@ -131,7 +137,12 @@ const TiposCreditoPage: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: number, nombre: string) => {
+  const handleDelete = async (id: number | undefined, nombre: string) => {
+    if (!id) {
+      setError("Error: ID del tipo de crédito no disponible");
+      return;
+    }
+    
     if (!window.confirm(`¿Está seguro de eliminar el tipo "${nombre}"?`)) {
       return;
     }

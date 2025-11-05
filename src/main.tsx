@@ -49,7 +49,6 @@ type RequireRoleProps = {
 
 const RequireRole: React.FC<RequireRoleProps> = ({ children, roles, redirectTo = "/app" }) => {
   const { user } = useAuth();
-  // no autenticado -> a login (el layout /app ya usa RequireAuth, pero añadimos chequeo seguro)
   if (!user) return <Navigate to="/login" replace />;
   const userRoles = Array.isArray(user.roles) ? user.roles.map(String) : [];
   const allowed = roles.some(r => userRoles.includes(r));
@@ -197,11 +196,15 @@ const router = createBrowserRouter([
       { index: true, element: <Inicio /> },
       { path: "empresas", element: <EmpresaPage /> },
       { path: "usuarios", element: <UsersPage /> },
-      { path: "clientes", element: <ClientesPage />, children: [
+      { 
+        path: "clientes", 
+        element: <ClientesPage />, 
+        children: [
           { index: true, element: <HistorialClientesPage /> },
           { path: "crear", element: <CrearClientePage /> },
-        ] },
-      { path: "gestion-usuarios", element: <GestionUsuariosRoles /> }, // ← Solo esta ruta
+        ] 
+      },
+      { path: "gestion-usuarios", element: <GestionUsuariosRoles /> },
       { path: "actividades", element: <HistorialActividadesPage /> },
       { path: "auditoria", element: <HistorialAuditoriaPage /> },
       { path: "reportes", element: <ReportesPage /> },
