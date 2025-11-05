@@ -15,13 +15,74 @@ import type {
   PaymentsResponse,
   SuscripcionResponse,
   CreateSuscripcionPayload,
+  CompanyRegistrationData,
+  PaymentData,
 } from "./types";
 
 /* catálogo inmutable de planes (mock/local) */
 const PLANS: ReadonlyArray<Plan> = [
-  { id: "basico", name: "Básico", priceUsd: 0, limits: { maxUsers: 3, maxRequests: 1000, maxStorageGB: 100 } },
-  { id: "profesional", name: "Pro", priceUsd: 80, limits: { maxUsers: 20, maxRequests: 25000, maxStorageGB: 300 } },
-  { id: "personalizado", name: "Personalizado", priceUsd: 300, limits: { maxUsers: 100, maxRequests: 60000, maxStorageGB: 1000 } },
+  { 
+    id: "basico", 
+    name: "Básico", 
+    priceUsd: 0, 
+    limits: { 
+      maxUsers: 3, 
+      maxRequests: 1000, 
+      maxStorageGB: 100,
+      supportLevel: "basic",
+      customReports: false,
+      apiAccess: false
+    },
+    features: [
+      "Hasta 3 usuarios",
+      "1,000 solicitudes/mes", 
+      "100 GB almacenamiento",
+      "Soporte básico por email"
+    ]
+  },
+  { 
+    id: "profesional", 
+    name: "Pro", 
+    priceUsd: 80, 
+    limits: { 
+      maxUsers: 20, 
+      maxRequests: 25000, 
+      maxStorageGB: 300,
+      supportLevel: "priority",
+      customReports: true,
+      apiAccess: true
+    },
+    features: [
+      "Hasta 20 usuarios",
+      "25,000 solicitudes/mes",
+      "300 GB almacenamiento", 
+      "Soporte prioritario",
+      "Reportes personalizados",
+      "API de integración"
+    ]
+  },
+  { 
+    id: "personalizado", 
+    name: "Personalizado", 
+    priceUsd: 300, 
+    limits: { 
+      maxUsers: 100, 
+      maxRequests: 60000, 
+      maxStorageGB: 1000,
+      supportLevel: "dedicated",
+      customReports: true,
+      apiAccess: true
+    },
+    features: [
+      "Hasta 100 usuarios",
+      "60,000 solicitudes/mes",
+      "1TB almacenamiento",
+      "Soporte dedicado 24/7",
+      "Reportes ilimitados",
+      "API completa",
+      "Integraciones personalizadas"
+    ]
+  },
 ] as const;
 
 export function listPlans(): Promise<Plan[]> {
@@ -78,42 +139,29 @@ function getAxiosResponseData(err: unknown): unknown | null {
   return r.data ?? null;
 }
 
-// Genera candidatos para el valor enum_plan según el planId
-function enumCandidatesForPlan(planId: PlanId): string[] {
-  switch (planId) {
-    case "basico":
-      return ["BASICO", "basico"];
-    case "profesional":
-      return ["PROFESIONAL", "PROFESSIONAL", "profesional", "professional"];
-    case "personalizado":
-      return ["PREMIUM", "PREMIUM_CUSTOM", "personalizado", "premium"];
-    default:
-      return [String(planId).toUpperCase()];
-  }
-}
-
-// Mapear plan IDs locales a enum del backend
-export function mapPlanToEnum(planId: PlanId): CreateSuscripcionPayload["enum_plan"] {
-  const mapping: Record<PlanId, CreateSuscripcionPayload["enum_plan"]> = {
+// Mapear plan IDs locales a tipo_plan del backend (CORREGIDO)
+export function mapPlanToEnum(planId: PlanId): string {
+  const mapping: Record<PlanId, string> = {
     basico: "BASICO",
-    profesional: "PROFESIONAL",
-    personalizado: "PREMIUM",
+    profesional: "PREMIUM",      // según tu documentación
+    personalizado: "PREMIUM",    // o crear "PERSONALIZADO" si existe
   };
   return mapping[planId];
 }
 
-// Calcular fecha de finalización
-export function calculateEndDate(duration: 'monthly' | 'yearly'): string {
+// Calcular fecha de finalización (CORREGIDO - devolver fecha_inicio también)
+export function calculateDates(duration: 'monthly' | 'yearly'): { fecha_inicio: string; fecha_fin: string } {
   const now = new Date();
-  const endDate = new Date(now);
+  const fecha_inicio = now.toISOString().split('T')[0]; // formato YYYY-MM-DD
   
-  if (duration === 'monthly') {
-    endDate.setMonth(endDate.getMonth() + 1);
+  if (duration === 'yearly') {
+    now.setFullYear(now.getFullYear() + 1);
   } else {
-    endDate.setFullYear(endDate.getFullYear() + 1);
+    now.setMonth(now.getMonth() + 1);
   }
   
-  return endDate.toISOString();
+  const fecha_fin = now.toISOString().split('T')[0];
+  return { fecha_inicio, fecha_fin };
 }
 
 /* =========================
@@ -131,7 +179,7 @@ export async function createSuscripcion(payload: CreateSuscripcionPayload): Prom
       tenantId: String(payload.empresa),
       action: 'create_subscription',
       actor: 'system',
-      meta: { planId: payload.enum_plan }
+      meta: { planId: payload.tipo_plan }
     });
 
     return res.data;
@@ -142,12 +190,13 @@ export async function createSuscripcion(payload: CreateSuscripcionPayload): Prom
       console.error('❌ Backend response:', respData);
       if (respData && typeof respData === "object") {
         const obj = respData as Record<string, unknown>;
-        if (obj.enum_plan && Array.isArray(obj.enum_plan)) {
-          const enumError = obj.enum_plan[0];
-          throw new Error(`Error en enum_plan: ${enumError}`);
+        if (obj.tipo_plan) {
+          throw new Error(`Error en campo tipo_plan: ${JSON.stringify(obj.tipo_plan)}`);
+        }
+        if (obj.errors) {
+          throw new Error(`Errores de validación: ${JSON.stringify(obj.errors)}`);
         }
       }
-      
       const msg = typeof respData === "string" ? respData : JSON.stringify(respData);
       throw new Error(`Error del servidor: ${msg}`);
     }
@@ -224,41 +273,25 @@ export async function createSuscripcionFromPlan(
   planId: PlanId,
   duration: 'monthly' | 'yearly' = 'monthly'
 ): Promise<SuscripcionResponse> {
-  const candidates = enumCandidatesForPlan(planId);
-  const fecha_fin = calculateEndDate(duration);
+  const plan = getPlanById(planId);
+  if (!plan) throw new Error("Plan no encontrado");
+  const { fecha_inicio, fecha_fin } = calculateDates(duration);
+  const tipo_plan = mapPlanToEnum(planId);
 
-  let lastError: unknown = null;
-  for (const candidate of candidates) {
-    const payload: CreateSuscripcionPayload = {
-      empresa: empresaId,
-      enum_plan: candidate as CreateSuscripcionPayload["enum_plan"],
-      enum_estado: 'ACTIVO',
-      fecha_fin,
-    };
-    try {
-      return await createSuscripcion(payload);
-    } catch (err) {
-      const data = getAxiosResponseData(err);
-      if (data && typeof data === "object" && (("enum_plan" in (data as Record<string, unknown>)) || ("errors" in (data as Record<string, unknown>)))) {
-        console.warn("[billing] enum_plan rechazado, probando siguiente candidato:", candidate);
-        lastError = err;
-        continue;
-      }
-      throw err;
-    }
-  }
+  const monto = Number(plan.priceUsd); // <-- asegurar número
 
-  if (lastError) {
-    const respData = getAxiosResponseData(lastError);
-    const readable = respData ? (typeof respData === "object" ? JSON.stringify(respData) : String(respData)) : (lastError instanceof Error ? lastError.message : String(lastError));
-    throw new Error(`No se pudo crear la suscripción. Último error: ${readable}`);
-  }
-  throw new Error("No se pudo crear la suscripción: candidatos agotados.");
+  const payload: CreateSuscripcionPayload = {
+    empresa: empresaId,
+    tipo_plan,
+    fecha_inicio,
+    fecha_fin,
+    monto: isNaN(monto) ? 0 : monto, // proteger por si plan.priceUsd era undefined/string inválido
+    estado: true,
+    metodo_pago: "TARJETA"
+  };
+
+  return await createSuscripcion(payload);
 }
-
-/* =========================
-   Suscripción / pagos / usage (mock + delegación a backend si existe)
-========================= */
 
 export async function getSubscription(tenantId?: string): Promise<Subscription | null> {
   const headers = tenantHeaders(tenantId);
@@ -483,4 +516,113 @@ export async function startTrial(planId: PlanId, orgName: string, actor: string,
   await saveLocalSubscription(sub);
   pushLocalHistoryEvent({ tenantId: id, action: "start_trial", actor, meta: { planId } });
   return sub;
+}
+
+// Agregar si no existe
+export async function createEmpresa(empresaData: {
+  nombre: string;
+  email: string;
+  telefono: string;
+  direccion: string;
+  nit?: string;
+}): Promise<{ id: number; nombre: string }> {
+  try {
+    console.log('[billing] 📤 POST /api/empresas/ payload:', JSON.stringify(empresaData, null, 2));
+    const res = await http.post<{ id: number; nombre: string }>('/api/empresas/', empresaData);
+    console.log('✅ Empresa creada:', res.data);
+
+    // opcional: push local history si quieres seguimiento
+    pushLocalHistoryEvent({
+      tenantId: String(res.data.id),
+      action: 'create_empresa',
+      actor: 'system',
+      meta: { nombre: res.data.nombre }
+    });
+
+    return res.data;
+  } catch (error) {
+    console.error('❌ Error creando empresa:', error);
+    const respData = getAxiosResponseData(error);
+    if (respData !== null) {
+      console.error('❌ Backend response:', respData);
+      const msg = typeof respData === "string" ? respData : JSON.stringify(respData);
+      throw new Error(`Error del servidor: ${msg}`);
+    }
+    throw error instanceof Error ? error : new Error(String(error));
+  }
+}
+
+// Registrar empresa completa con suscripción
+export async function registerCompanyWithSubscription(
+  companyData: CompanyRegistrationData
+): Promise<{ empresa_id: number; user: unknown; subscription: SuscripcionResponse }> {
+  
+  // 1. Registrar empresa y usuario
+  const registerResponse = await http.post("/api/register/empresa-user/", {
+    razon_social: companyData.razon_social,
+    nombre_comercial: companyData.nombre_comercial,
+    email_contacto: companyData.email_contacto,
+    imagen_url_empresa: companyData.imagen_url_empresa || "",
+    username: companyData.username,
+    password: companyData.password,
+    first_name: companyData.first_name,
+    last_name: companyData.last_name,
+    email: companyData.email,
+    imagen_url_perfil: companyData.imagen_url_perfil || ""
+  });
+
+  if (!registerResponse.data.empresa?.id) {
+    throw new Error("No se recibió empresa_id del servidor");
+  }
+
+  const empresa_id = Number(registerResponse.data.empresa.id);
+  const user = registerResponse.data.user;
+
+  // 2. Crear suscripción usando el nuevo formato
+  const subscriptionResponse = await createSuscripcionFromPlan(
+    empresa_id,
+    companyData.selected_plan,
+    companyData.billing_period
+  );
+
+  return {
+    empresa_id,
+    user,
+    subscription: subscriptionResponse
+  };
+}
+
+// Procesar pago (integrar con Stripe, PayPal, etc.)
+export async function processPayment(
+  paymentData: PaymentData,
+  amount: number,
+  currency: string = "USD"
+): Promise<{ success: boolean; transactionId?: string; error?: string }> {
+  // Aquí integrarías con tu pasarela de pago
+  console.log("Procesando pago:", { paymentData, amount, currency });
+  
+  // Simulación de pago exitoso
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      if (paymentData.method === "card" && paymentData.cardNumber?.startsWith("4")) {
+        resolve({
+          success: true,
+          transactionId: `txn_${Date.now()}`
+        });
+      } else {
+        resolve({
+          success: false,
+          error: "Tarjeta declinada o datos inválidos"
+        });
+      }
+    }, 2000);
+  });
+}
+
+// Calcular precio según periodo
+export function calculatePrice(plan: Plan, period: "monthly" | "yearly"): number {
+  if (period === "yearly" && plan.priceYearly) {
+    return plan.priceYearly;
+  }
+  return plan.priceMonthly || plan.priceUsd;
 }

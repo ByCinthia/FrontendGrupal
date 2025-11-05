@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Outlet, Link, useLocation } from "react-router-dom";
 import { listCredits, changeStatus } from "./service";
 import type { Credit, CreditStatus, ListCreditsParams, Moneda } from "./types";
-import "../../styles/dashboard.css";
+import "../../styles/theme.css";
 import { useAuth } from "../auth/service";
 
 const ESTADOS: (CreditStatus | "ALL")[] = [
@@ -29,37 +29,23 @@ const TabNavigation: React.FC = () => {
   const location = useLocation();
   const { user } = useAuth();
   const isAdmin = user?.roles?.includes("admin") || user?.roles?.includes("superadmin");
-  
+
   const isGestion = location.pathname === "/app/creditos";
-  const isSolicitar = location.pathname === "/app/creditos/solicitar";
-  const isTipos = location.pathname === "/app/creditos/tipos";
+  const isCrear = location.pathname === "/app/creditos/crear" || location.pathname.endsWith("/crear");
+  const isHistorial = location.pathname === "/app/creditos/historial" || location.pathname.endsWith("/historial");
+  const isTipos = location.pathname === "/app/creditos/tipos" || location.pathname.endsWith("/tipos");
 
   return (
-    <nav className="ui-tabs">
-      <Link 
-        to="/app/creditos" 
-        className={`ui-tab ${isGestion ? "ui-tab--active" : ""}`}
-      >
-        Gestión de créditos
-      </Link>
-      <Link 
-        to="/app/creditos/solicitar" 
-        className={`ui-tab ${isSolicitar ? "ui-tab--active" : ""}`}
-      >
-        Solicitar crédito
-      </Link>
-      {isAdmin && (
-        <Link 
-          to="/app/creditos/tipos" 
-          className={`ui-tab ${isTipos ? "ui-tab--active" : ""}`}
-        >
-          Tipos de crédito
-        </Link>
-      )}
+    <nav className="ui-tabs" style={{ marginBottom: 16 }}>
+      <Link to="/app/creditos" className={`ui-tab ${isGestion ? "ui-tab--active" : ""}`}>Gestión</Link>
+      <Link to="/app/creditos/crear" className={`ui-tab ${isCrear ? "ui-tab--active" : ""}`}>➕ Crear crédito</Link>
+      <Link to="/app/creditos/historial" className={`ui-tab ${isHistorial ? "ui-tab--active" : ""}`}>📋 Historial</Link>
+      {isAdmin && <Link to="/app/creditos/tipos" className={`ui-tab ${isTipos ? "ui-tab--active" : ""}`}>🧾 Tipos</Link>}
     </nav>
   );
 };
 
+/* ---------- Toolbar / Table UI ---------- */
 const Toolbar: React.FC<{
   filters: Pick<ListCreditsParams, "search" | "estado">;
   onChange: (p: Partial<ListCreditsParams>) => void;
@@ -110,9 +96,7 @@ const Row: React.FC<{
 }> = ({ c, busyId, onEvaluar, onAprobar, onRechazar }) => {
   const isBusy = busyId === c.id;
   const buttons: React.ReactNode[] = [];
-  if (c.estado === "SOLICITADO") {
-    buttons.push(<button key="evaluar" className="ui-btn ui-btn--ghost" disabled={isBusy} onClick={() => onEvaluar(c.id)}>Evaluar</button>);
-  }
+  if (c.estado === "SOLICITADO") buttons.push(<button key="evaluar" className="ui-btn ui-btn--ghost" disabled={isBusy} onClick={() => onEvaluar(c.id)}>Evaluar</button>);
   if (c.estado === "EN_EVALUACION") {
     buttons.push(<button key="aprobar" className="ui-btn ui-btn--ghost" disabled={isBusy} onClick={() => onAprobar(c.id)}>Aprobar</button>);
     buttons.push(<button key="rechazar" className="ui-btn ui-btn--ghost" disabled={isBusy} onClick={() => onRechazar(c.id)}>Rechazar</button>);
@@ -158,7 +142,7 @@ const GestionCreditos: React.FC = () => {
   const filters = useMemo(() => ({ search, estado, page, page_size: pageSize }), [search, estado, page, pageSize]);
 
   useEffect(() => {
-    (async () => {
+    void (async () => {
       try {
         setLoading(true); setError(null);
         const res = await listCredits(filters);
@@ -238,10 +222,13 @@ const CreditsPage: React.FC = () => {
 
   return (
     <section className="ui-page">
-      <h1 className="ui-page__title">Créditos</h1>
-      
+      <header style={{ marginBottom: 12 }}>
+        <h1 className="ui-page__title">Créditos</h1>
+        <p style={{ color: "#6b7280" }}>Solicitudes y administración de créditos</p>
+      </header>
+
       <TabNavigation />
-      
+
       <div className="ui-tab-content">
         {showGestion ? <GestionCreditos /> : <Outlet />}
       </div>

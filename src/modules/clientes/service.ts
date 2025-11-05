@@ -1,4 +1,4 @@
-import { http } from "../../../shared/api/client";
+import { http } from "../../shared/api/client";
 import type { Cliente } from "./types";
 
 // Tipos para las posibles respuestas de la API

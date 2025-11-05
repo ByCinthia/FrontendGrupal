@@ -26,16 +26,7 @@ export function isHybridMode(): boolean {
 /* =======================================
    Normalización segura de la baseURL
    ======================================= */
-function resolveBaseURL(): string {
-  const raw = API_CONFIG.baseURL;
-  if (!raw) return ""; // mismo origin
-  try {
-    return new URL(raw).toString().replace(/\/$/, "");
-  } catch {
-    console.warn("[API] VITE_API_URL inválida. Usando '' (mismo origen).");
-    return "";
-  }
-}
+
 
 /* =======================
    Claves de almacenamiento
@@ -99,11 +90,10 @@ export const getTenantId = (): string | undefined => {
 /* ==================
    Cliente HTTP Axios
    ================== */
-// En desarrollo usamos proxy de Vite (base ""), en producción usamos la base real.
-const defaultBase = import.meta.env.DEV ? "" : resolveBaseURL();
 
+// NOTA: dejar baseURL vacío para usar proxy de Vite (usa rutas relativas "/api/...")
 export const http = axios.create({
-  baseURL: defaultBase,
+  baseURL: "", // <- ruta relativa: Vite proxy reenviará /api -> backend
   timeout: 30000,
   headers: {
     "Content-Type": "application/json",

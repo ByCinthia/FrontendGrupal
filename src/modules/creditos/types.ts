@@ -150,7 +150,7 @@ export const adaptCredit = (d: CreditDTO): Credit => ({
  * Moneda: códigos ISO o abreviaturas que uses en backend.
  * Ajusta los valores si tu backend usa otros códigos (p.ej. "PEN", "USD", "EUR", "CLP").
  */
-export type Moneda = "USD" | "EUR" | "PEN" | "CLP" | "ARS";
+export type Moneda = "USD" | "EUR" | "PEN" | "CLP" | "ARS"| "BOB";
 
 /**
  * Frecuencia de pago usada en los créditos

@@ -1,6 +1,6 @@
 // src/modules/backup/backup.tsx
 import React, { useState, useEffect } from "react";
-import "../../styles/dashboard.css";
+import "../../styles/theme.css";
 
 interface BackupItem {
   id: string;

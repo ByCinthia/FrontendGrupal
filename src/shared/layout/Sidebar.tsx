@@ -159,3 +159,4 @@ const Sidebar: React.FC<SidebarProps> = ({ brand = "Mi Empresa", collapseOnNavig
 };
 
 export default Sidebar;
+

@@ -26,16 +26,18 @@ export type UserDTO = {
 export interface User {
   id: number | string;
   nombre: string;
-  apellido?: string;
+  apellido?: string; // <-- agregado
   username?: string;
-  email: string;
+  email?: string;
   telefono?: string;
-  role?: string;
-  activo: boolean;
+  role?: "superadmin" | "administrador" | "gerente" | "contador" | "usuario";
+  activo?: boolean;
   last_login?: string;
   created_at?: string;
   updated_at?: string;
-  empresa_id?: number | string; // También lo añadimos a la interfaz User
+  empresa_id?: number | string;
+  // Agregado para evitar el error en UserEditModal
+  group_id?: number | string;
 }
 
 // Tipo exacto para la tabla Django auth_user (estructura backend)

@@ -1,132 +1,139 @@
-// Tipos de planes y suscripción (sin any)
+// Tipos actualizados para el flujo completo
 
 export type PlanId = "basico" | "profesional" | "personalizado";
+export type PaymentMethod = "card" | "paypal" | "bank_transfer" | "manual";
 
+/* Tipos básicos de Plan / Límites */
 export interface PlanLimits {
   maxUsers: number;
-  maxRequests: number; // por mes
+  maxRequests: number;
   maxStorageGB: number;
+  supportLevel?: "basic" | "priority" | "dedicated";
+  customReports?: boolean;
+  apiAccess?: boolean;
 }
 
 export interface Plan {
   id: PlanId;
   name: string;
+  description?: string;
   priceUsd: number;
+  priceMonthly?: number;
+  priceYearly?: number;
+  isPopular?: boolean;
   limits: PlanLimits;
+  features?: string[];
 }
 
-/* Cambiado a type-only para evitar generar código en tiempo de ejecución */
-export type SubscriptionState = "en_prueba" | "activo" | "cancelado";
-
-/**
- * Subscription guarda referencia al tenant (tenantId) y al plan mediante planId
- * (coincide con tu modelo app_suscripciones).
- */
+/* Suscripción / Uso / Historial / Pagos (simplificados según uso en frontend) */
 export interface Subscription {
-  id: string;
-  tenantId: string;         // corresponde a tenant (multi-tenant)
+  id: string | number;
+  empresaId?: number;
   planId: PlanId;
-  state: SubscriptionState;
+  state: "en_prueba" | "activo" | "cancelado";
+  orgName?: string;
   trialEndsAt?: string | null;
-  startedAt?: string | null;
-  cancelledAt?: string | null;
-  orgName?: string | null; // <-- añadido: nombre de la organización / tenant
+  startedAt?: string;
+  expiresAt?: string | null;
+  cancelledAt?: string | null; // añadido porque service.ts lo usa
+  tenantId?: string; // añadido para compatibilidad con uso local
 }
 
-/* Pagos (pago_suscripciones) */
-export type PaymentMethod = "card" | "paypal" | "bank_transfer" | "manual";
+export interface Usage {
+  users: number;
+  requests: number;
+  storageGB: number;
+  measuredAt?: string;
+  tenantId?: string; // añadido
+}
 
+export interface HistoryEvent {
+  id: string;
+  action: string;
+  at: string;
+  actor?: string;
+  meta?: Record<string, unknown>;
+  tenantId?: string; // añadido
+}
+
+export interface HistoryPage {
+  total: number;        // service.ts devuelve "total"
+  page: number;
+  pageSize: number;
+  results: HistoryEvent[];
+}
+
+/* Pago / Registro / Respuestas del backend */
 export interface Payment {
   id: string;
-  tenantId: string;
+  createdAt: string;
   amountCents: number;
   currency: string;
   periodStart?: string | null;
   periodEnd?: string | null;
-  method: "card" | "paypal" | "bank_transfer" | "manual";
+  method: string;
   externalId?: string | null;
-  createdAt: string;
+  tenantId?: string; // añadido
 }
 
-/* Usage / límites consumidos por tenant (para mostrar progress) */
-export interface Usage {
-  tenantId: string;
-  users: number;
-  requests: number;
-  storageGB: number;
-  measuredAt: string;
+/* payload para crear suscripción desde frontend - ACTUALIZADO según backend real */
+export interface CreateSuscripcionPayload {
+  empresa: number;           // ← debe ser number
+  tipo_plan: string;
+  fecha_inicio: string;
+  fecha_fin: string;
+  monto: number;            // ← debe ser number
+  estado: boolean;
+  metodo_pago?: string;
+  transaction_id?: string;
 }
 
-/* Historial / events */
-export interface HistoryEvent {
-  id: string;
-  tenantId: string;
-  action: string;
-  actor: string;
-  at: string; // ISO
-  meta?: Record<string, unknown>;
+export interface SuscripcionResponse {
+  id: number;
+  empresa: number;
+  tipo_plan: string;
+  fecha_inicio: string;
+  fecha_fin: string;
+  monto: string | number;
+  estado: boolean;
+  metodo_pago?: string;
+  fecha_creacion?: string;
 }
 
-/* respuestas auxiliares */
 export interface SubscriptionResponse {
   subscription?: Subscription;
-  message?: string;
 }
 
 export interface PaymentsResponse {
-  payments: Payment[];
-  total?: number;
+  payments?: Payment[];
 }
 
-export interface HistoryPage {
-  results: HistoryEvent[];
-  total: number;
-  page: number;
-  pageSize: number;
+/* Registro empresa + usuario (frontend) */
+export interface CompanyRegistrationData {
+  razon_social: string;
+  nombre_comercial: string;
+  email_contacto: string;
+  imagen_url_empresa?: string;
+
+  username: string;
+  password: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  imagen_url_perfil?: string;
+
+  selected_plan: PlanId;
+  billing_period: "monthly" | "yearly";
 }
 
-export interface License {
-  id: string;
-  orgId: string;
-  version: string;
-  purchasedAt: string;
-  expiresAt?: string;
-  supportUntil?: string;
+/* Datos de pago enviados al procesador (frontend) */
+export interface PaymentData {
+  method: PaymentMethod;
+  cardNumber?: string;
+  expiryDate?: string;
+  cvv?: string;
+  cardHolder?: string;
+  paypalEmail?: string;
 }
 
-// Nuevos tipos para suscripción según tu modelo Django
-export interface SuscripcionData {
-  fecha_inicio: string;
-  fecha_fin: string;
-  activo: boolean;
-  empresa: number;
-  enum_plan: 'BASICO' | 'PREMIUM' | 'PROFESIONAL';
-  enum_estado: 'ACTIVO' | 'SUSPENDIDO' | 'CANCELADO';
-}
-
-export type SuscripcionEstado = "ACTIVO" | "PENDIENTE" | "CANCELADO" | string;
-
-export interface SuscripcionResponse {
-  id: number | string;
-  empresa: number | string;
-  planId: string;
-  estado: SuscripcionEstado;
-  fecha_inicio?: string;
-  fecha_fin?: string | null;
-  [k: string]: unknown;
-}
-
-export interface CreateSuscripcionPayload {
-  // El backend Django espera `empresa` (id), no `empresa_id`
-  empresa: number;
-  enum_plan: 'BASICO' | 'PREMIUM' | 'PROFESIONAL';
-  enum_estado?: 'ACTIVO' | 'SUSPENDIDO' | 'CANCELADO';
-  fecha_fin: string; // ISO string
-}
-
-// Mapeo de planes locales a enum del backend
-export type PlanToEnumMap = {
-  basico: 'BASICO';
-  profesional: 'PROFESIONAL';
-  personalizado: 'PREMIUM';
-};
+/* Export por defecto no necesario, se exportan tipos nombrados */

@@ -1,6 +1,6 @@
 import React from "react";
 import { useAuth } from "../../modules/auth/service";
-import "../../styles/unified-app.css";
+import "../../styles/theme.css";
 
 const getInitials = (name?: string | null) => {
   if (!name) return "";

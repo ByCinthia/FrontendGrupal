@@ -1,6 +1,6 @@
 // src/modules/actividades/historial_simple.tsx
 import React, { useState, useEffect } from "react";
-import "../../styles/dashboard.css";
+import "../../styles/theme.css";
 import { RequireAuth } from "../../shared/api/guards";
 import { useAuth } from "../auth/service";
 

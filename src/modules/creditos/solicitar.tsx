@@ -3,9 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { createCredit } from "./service";
 import type { CreateCreditInput } from "./service";
 import type { Moneda } from "./types";
-import { listClients } from "./clients/service";
-import type { Cliente } from "./clients/types";
-import "../../styles/dashboard.css";
+import { listClients } from "./../clientes/service";
+import type { Cliente } from "../clientes/types";
+import "../../styles/theme.css";
 
 const MONEDAS: Moneda[] = ["USD", "EUR", "PEN", "CLP", "ARS", "BOB"];
 const FRECUENCIAS = ["MENSUAL", "QUINCENAL", "SEMANAL"];

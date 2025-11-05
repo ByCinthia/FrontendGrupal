@@ -2,16 +2,17 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-// Proxy simple para desarrollo: enruta /api -> backend en 127.0.0.1:8000 (evita CORS)
 export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
+      // Proxy para evitar CORS en desarrollo: /api/* -> http://127.0.0.1:8000/api/*
       "/api": {
         target: "http://127.0.0.1:8000",
         changeOrigin: true,
         secure: false,
-        ws: false,
+        // no rewrite necesario si el backend usa /api/ rutas
+        // rewrite: (path) => path.replace(/^\/api/, "/api")
       },
     },
   },

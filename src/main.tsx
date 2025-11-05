@@ -5,8 +5,7 @@ import { createBrowserRouter, RouterProvider, Navigate } from "react-router-dom"
 
 import { AuthProvider, useAuth } from "./modules/auth/service";
 import DashboardLayout from "./modules/dashboard/dashboard";
-// IMPORT DE TOPBAR ELIMINADO (ya no se usa desde main)
-import { RequireAuth, PublicOnly } from "./shared/api/guards";
+import { RequireAuth } from "./shared/api/guards";
 
 // Pages - Landing y Auth
 import LandingPage from "./modules/landing/landing_page";
@@ -15,19 +14,15 @@ import CompanySignupPage from "./modules/landing/company_register";
 
 // Pages - Dashboard Protected
 import UsersPage from "./modules/usuarios/page";
-import CrearUsuarioPage from "./modules/usuarios/crear_usuario";
-import CrearGroup from "./modules/usuarios/crear_group";
+import GestionUsuariosRoles from "./modules/usuarios/gestion_usuarios_roles"; // ← Solo esta
 import CreditsPage from "./modules/creditos/page";
 import SolicitarCredito from "./modules/creditos/solicitar";
 import PagosPage from "./modules/pagos/page";
 import EmpresaPage from "./modules/empresa/page";
 
 // Pages - Billing
-import PlanSelectionPage from "./modules/billing/plan_selection";
-import PlanesStandalone from "./modules/billing/planes_standalone";
-import SubscriptionPage from "./modules/billing/suscripcion_page";
-import CheckoutMockPage from "./modules/billing/checkout_page";
 import RegistroOnPremise from "./modules/billing/registro_onpremise";
+import SubscriptionPage from "./modules/billing/suscripcion_page";
 
 // Pages - Reports y Auditoria
 import HistorialAuditoriaPage from "./modules/auditoria/historial";
@@ -37,15 +32,13 @@ import PersonalizacionPage from "./modules/personalizacion/personalizacion";
 import BackupPage from "./modules/backup/backup";
 import DashboardIngresos from "./modules/ingresos/dashboard";
 import { Link } from "react-router-dom";
-import "./styles/unified-app.css";
+import "./styles/theme.css";
+import "./shared/layout/topbar.css";
 import TiposCreditoPage from "./modules/creditos/tipos/page";
 
 // Componente de inicio mejorado
 export function Inicio() {
-  const { user } = useAuth(); // solo user, sin logout
-
-
-  //const userDisplay = getUserDisplay();
+  const { user } = useAuth();
 
   // obtener preview de personalización desde localStorage (solo usado en cards)
   const companyLogo = typeof window !== "undefined" ? localStorage.getItem("ui.company.logo") : null;
@@ -56,48 +49,9 @@ export function Inicio() {
 
   return (
     <section className="page">
-      {/* El header de bienvenida para la ruta index ("/app") se renderiza desde DashboardLayout */}
-      
-      {/* Información del sistema */}
-      <div style={{
-        padding: "20px",
-        backgroundColor: "#f0f9ff",
-        borderRadius: "12px",
-        border: "1px solid #bfdbfe",
-        marginBottom: "24px"
-      }}>
-        <h3 style={{ 
-          margin: "0 0 16px 0", 
-          color: "#1e40af",
-          fontSize: "18px",
-          fontWeight: "600"
-        }}>
-          🔧 Estado del Sistema
-        </h3>
-        <div style={{ 
-          display: "grid", 
-          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", 
-          gap: "16px",
-          fontSize: "14px"
-        }}>
-          <div style={{ color: "#1e40af" }}>
-            <strong>Sesión:</strong> {localStorage.getItem("auth.token") ? "✅ Activa" : "❌ Inactiva"}
-          </div>
-          <div style={{ color: "#1e40af" }}>
-            <strong>Usuario ID:</strong> {user?.id || "N/A"}
-          </div>
-          <div style={{ color: "#1e40af" }}>
-            <strong>Permisos:</strong> {user?.permissions?.includes("*") ? "🔓 Completos" : "🔒 Limitados"}
-          </div>
-          <div style={{ color: "#1e40af" }}>
-            <strong>Acceso:</strong> {user?.roles?.includes("superadmin") ? "🌐 Global" : "🏢 Empresa"}
-          </div>
-        </div>
-      </div>
-      
       {/* Enlaces rápidos */}
       <div>
-        <h3 style={{ margin: "0 0 16px 0", color: "#1f2937", fontSize: "18px", fontWeight: "600" }}>
+        <h3 style={{ margin: "0 0 16px 0", color: "#a78bfa", fontSize: "18px", fontWeight: "600" }}>
           🚀 Accesos Rápidos
         </h3>
 
@@ -120,12 +74,22 @@ export function Inicio() {
             </Link>
           )}
 
+          {/* Gestión de Usuarios y Roles - superadmin y admin */}
+          {(user?.roles?.includes("superadmin") || user?.roles?.includes("admin")) && (
+            <Link to="/app/gestion-usuarios" style={{ textDecoration: "none" }}>
+              <div className="quick-card">
+                <h4>👥 Gestión de Usuarios y Roles</h4>
+                <p>Panel centralizado para usuarios, roles y permisos + Django Admin</p>
+              </div>
+            </Link>
+          )}
+
           {/* Usuarios - superadmin y admin */}
           {(user?.roles?.includes("superadmin") || user?.roles?.includes("admin")) && (
             <Link to="/app/usuarios" style={{ textDecoration: "none" }}>
               <div className="quick-card">
-                <h4>👥 Usuarios</h4>
-                <p>Gestión de usuarios y permisos</p>
+                <h4>📋 Listar Usuarios</h4>
+                <p>Ver y gestionar lista de usuarios del sistema</p>
               </div>
             </Link>
           )}
@@ -137,7 +101,7 @@ export function Inicio() {
                 width: 48,
                 height: 48,
                 borderRadius: 8,
-                background: companyLogo ? `url(${companyLogo}) center/cover` : (accent || "#3b82f6"),
+                background: companyLogo ? `url(${companyLogo}) center/cover` : (accent || "#7c3aed"),
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -149,12 +113,12 @@ export function Inicio() {
               </div>
               <div>
                 <h4 style={{ margin: 0 }}>🎨 Personalización</h4>
-                <p style={{ margin: 0, color: "#6b7280" }}>Ajusta temas, logo y apariencia</p>
+                <p style={{ margin: 0, color: "#a78bfa" }}>Ajusta temas, logo y apariencia</p>
               </div>
             </div>
           </Link>
 
-          {/* Módulos comunes para todos (sin Configuración) */}
+          {/* Módulos comunes para todos */}
           <Link to="/app/reportes" style={{ textDecoration: "none" }}>
             <div className="quick-card">
               <h4>📈 Reportes</h4>
@@ -191,18 +155,6 @@ const router = createBrowserRouter([
     element: <AuthPage />,
   },
   {
-    path: "/registro-empresa",
-    element: (
-      <PublicOnly>
-        <CompanySignupPage />
-      </PublicOnly>
-    ),
-  },
-  {
-    path: "/planes",
-    element: <PlanesStandalone />,
-  },
-  {
     path: "/registro-onpremise",
     element: <RegistroOnPremise />,
   },
@@ -211,20 +163,8 @@ const router = createBrowserRouter([
     element: <CompanySignupPage />,
   },
   {
-    path: "/planes-seleccion",
-    element: <PlanSelectionPage />,
-  },
-  {
-    path: "/checkout-mock",
-    element: <CheckoutMockPage />,
-  },
-  {
     path: "/mi-suscripcion",
-    element: (
-      <RequireAuth>
-        <SubscriptionPage />
-      </RequireAuth>
-    ),
+    element: <SubscriptionPage />,
   },
   {
     path: "/app",
@@ -237,11 +177,10 @@ const router = createBrowserRouter([
       { index: true, element: <Inicio /> },
       { path: "empresas", element: <EmpresaPage /> },
       { path: "usuarios", element: <UsersPage /> },
-      { path: "crear-usuario", element: <CrearUsuarioPage /> },
-      { path: "crear-grupo", element: <CrearGroup /> },
-      { path: "actividades", element: <HistorialActividadesPage /> }, // ← USAR historial.tsx
+      { path: "gestion-usuarios", element: <GestionUsuariosRoles /> }, // ← Solo esta ruta
+      { path: "actividades", element: <HistorialActividadesPage /> },
       { path: "auditoria", element: <HistorialAuditoriaPage /> },
-      { path: "reportes", element: <ReportesPage /> }, // ← USAR desde index
+      { path: "reportes", element: <ReportesPage /> },
       { path: "personalizacion", element: <PersonalizacionPage /> },
       { path: "ingresos", element: <DashboardIngresos /> },
       { path: "backup", element: <BackupPage /> },
@@ -250,7 +189,7 @@ const router = createBrowserRouter([
         element: <CreditsPage />,
         children: [
           { path: "solicitar", element: <SolicitarCredito /> },
-          { path: "tipos", element: <TiposCreditoPage /> }, // ← NUEVA RUTA
+          { path: "tipos", element: <TiposCreditoPage /> },
         ],
       },
       { path: "pagos", element: <PagosPage /> },

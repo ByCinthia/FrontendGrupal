@@ -1,6 +1,6 @@
 // src/modules/ingresos/dashboard.tsx
 import React, { useState, useEffect, useCallback } from "react";
-import "../../styles/dashboard.css";
+import "../../styles/theme.css";
 
 interface IngresoData {
   fecha: string;

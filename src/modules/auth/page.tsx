@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "./service";
-import "../../styles/auth.css";
+import "../../styles/theme.css";
 
 const AuthPage: React.FC = () => {
   const { login, user } = useAuth();
@@ -397,3 +397,4 @@ export type AuthCtx = {
   canAccessAllCompanies: () => boolean;
   getCompanyScope: () => number | string | null;
 };
+

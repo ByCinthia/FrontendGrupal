@@ -14,7 +14,7 @@ import type {
   CreditInfo,
   ProcessPaymentInput
 } from "./types";
-import "../../styles/dashboard.css";
+import "../../styles/theme.css";
 
 const ESTADOS: (PaymentStatus | "ALL")[] = [
   "ALL", "PENDIENTE", "PROCESANDO", "COMPLETADO", "FALLIDO", "CANCELADO"

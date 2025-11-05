@@ -13,7 +13,7 @@ import {
   clearHistory,
 } from "../billing/service";
 import type { Subscription, Usage, Plan, PlanId, HistoryEvent, Payment } from "../billing/types";
-import "../../styles/dashboard.css";
+import "../../styles/theme.css";
 
 const pct = (used: number, max: number): number => Math.min(100, Math.round((used / max) * 100));
 const levelClass = (p: number): string => (p >= 100 ? "alert" : p >= 80 ? "warn" : "ok");
@@ -332,3 +332,4 @@ const SubscriptionPage: React.FC = () => {
 };
 
 export default SubscriptionPage;
+

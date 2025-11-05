@@ -1,59 +1,186 @@
 // modules/dashboard/dashboard.tsx
-import React from "react";
+import { useState, useEffect } from "react";
 import { Outlet, useLocation } from "react-router-dom";
-import Sidebar from "../../shared/layout/Sidebar";
-import SharedHeader from "../../shared/layout/SharedHeader";
 import { useAuth } from "../auth/service";
-import "../../styles/unified-app.css";
+import Topbar from "../../shared/layout/Topbar";
+import Sidebar from "../../shared/layout/Sidebar";
+import "../../shared/layout/sidebar.css";
+import "../../styles/dashboard.css";
 
-const DashboardLayout: React.FC = () => {
+// Tipo extendido para evitar usar 'any'
+interface ExtendedUser {
+  id?: number;
+  username?: string;
+  roles?: string[];
+  permissions?: string[];
+  first_name?: string;
+  last_name?: string;
+  imagen_url_perfil?: string;
+  empresa?: {
+    razon_social?: string;
+    imagen_url_empresa?: string;
+  };
+}
+
+export default function DashboardLayout() {
   const { user } = useAuth();
   const location = useLocation();
+  const [showWelcome, setShowWelcome] = useState(false);
 
-  const getUserDisplay = () => {
-    if (user?.nombre_completo?.trim()) return user.nombre_completo;
-    if (user?.username?.trim()) return user.username;
-    if (user?.email && user.email.includes("@")) return user.email.split("@")[0];
-    return "Usuario";
-  };
+  // Estados para datos de usuario y empresa
+  const [welcomeData, setWelcomeData] = useState({
+    userName: '',
+    companyName: '',
+    userRole: '',
+    currentTime: ''
+  });
 
-  const userDisplay = getUserDisplay();
+  useEffect(() => {
+    // Mostrar bienvenida solo en la página principal del dashboard
+    setShowWelcome(location.pathname === '/app');
+
+    // Configurar datos de bienvenida usando tipo específico
+    const extendedUser = user as ExtendedUser;
+    const userName = extendedUser?.first_name && extendedUser?.last_name 
+      ? `${extendedUser.first_name} ${extendedUser.last_name}`
+      : user?.username || 'Usuario';
+
+    const companyName = localStorage.getItem("ui.company.name") || 
+                       localStorage.getItem("ui.companyName") || 
+                       extendedUser?.empresa?.razon_social || 
+                       "tu empresa";
+
+    const userRole = user?.roles?.[0] || 'usuario';
+
+    // Obtener saludo según la hora
+    const now = new Date();
+    const hour = now.getHours();
+    let greeting = '';
+    
+    if (hour >= 5 && hour < 12) {
+      greeting = 'Buenos días';
+    } else if (hour >= 12 && hour < 19) {
+      greeting = 'Buenas tardes';
+    } else {
+      greeting = 'Buenas noches';
+    }
+
+    const currentTime = now.toLocaleDateString('es-ES', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
+    setWelcomeData({
+      userName,
+      companyName,
+      userRole,
+      currentTime: `${greeting}, hoy es ${currentTime}`
+    });
+  }, [user, location.pathname]);
 
   return (
-    <div className="app-shell">
-      <Sidebar brand="WF Finanzas" />
-
-      <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-        {/* SharedHeader: empresa + avatar — se muestra en todas las vistas */}
-        <SharedHeader />
-
-        {/* Header específico del dashboard (index "/app") */}
-        {location.pathname === "/app" && (
-          <header className="dashboard__header dashboard__header--dark">
-            <div className="dashboard__header-inner">
-              <div className="dashboard__greeting">
-                <h1 className="dashboard__title">¡Bienvenido, {userDisplay}!</h1>
-                <p className="dashboard__subtitle">Aquí puedes gestionar usuarios, ver reportes y administrar créditos.</p>
-
-                <ul className="dashboard__features" aria-label="Características principales">
-                  <li>• Panel con métricas en tiempo real</li>
-                  <li>• Gestión de usuarios y permisos</li>
-                  <li>• Control y solicitud de créditos</li>
-                  <li>• Reportes exportables</li>
-                </ul>
+    <div className="dashboard-layout">
+      {/* Layout principal con sidebar y área de contenido */}
+      <div className="dashboard-main">
+        {/* Sidebar */}
+        <Sidebar />
+        
+        {/* Área de contenido (topbar + main) */}
+        <div className="dashboard-content-area">
+          {/* Topbar moderno - solo en el área de contenido */}
+          <Topbar 
+            showSearch={false}
+            showNotifications={true}
+          />
+          
+          {/* Estado del Sistema (solo en dashboard principal) */}
+          {showWelcome && (
+            <div className="system-status">
+              <h3>🔧 Estado del Sistema</h3>
+              <div className="system-status-grid">
+                <div className="system-status-item">
+                  <strong>Sesión:</strong>
+                  <span className="system-status-value">
+                    {localStorage.getItem("auth.token") ? "✅ Activa" : "❌ Inactiva"}
+                  </span>
+                </div>
+                <div className="system-status-item">
+                  <strong>Usuario ID:</strong>
+                  <span className="system-status-value">{user?.id || "N/A"}</span>
+                </div>
+                <div className="system-status-item">
+                  <strong>Permisos:</strong>
+                  <span className="system-status-value">
+                    {user?.permissions?.includes("*") ? "🔓 Completos" : "🔒 Limitados"}
+                  </span>
+                </div>
+                <div className="system-status-item">
+                  <strong>Acceso:</strong>
+                  <span className="system-status-value">
+                    {user?.roles?.includes("superadmin") ? "🌐 Global" : "🏢 Empresa"}
+                  </span>
+                </div>
               </div>
-
-              <div className="dashboard__header-right-placeholder" aria-hidden />
             </div>
-          </header>
-        )}
-
-        <main className="content" style={{ paddingTop: 0 }}>
-          <Outlet />
-        </main>
+          )}
+          
+          {/* Bienvenida (solo en dashboard principal) */}
+          {showWelcome && (
+            <div className="dashboard-welcome">
+              <div className="welcome-content">
+                <div className="welcome-text">
+                  <h1 className="welcome-title">
+                    ¡Bienvenido de vuelta, <span className="welcome-name">{welcomeData.userName}</span>!
+                  </h1>
+                  <p className="welcome-subtitle">
+                    {welcomeData.currentTime}
+                  </p>
+                  <p className="welcome-company">
+                    Panel de administración de <strong>{welcomeData.companyName}</strong> · 
+                    <span className="welcome-role"> {welcomeData.userRole}</span>
+                  </p>
+                </div>
+                <div className="welcome-stats">
+                  <div className="welcome-stat">
+                    <div className="stat-icon">👥</div>
+                    <div className="stat-info">
+                      <span className="stat-number">
+                        {user?.permissions?.includes("*") ? "Completo" : "Limitado"}
+                      </span>
+                      <span className="stat-label">Acceso</span>
+                    </div>
+                  </div>
+                  <div className="welcome-stat">
+                    <div className="stat-icon">🏢</div>
+                    <div className="stat-info">
+                      <span className="stat-number">
+                        {user?.roles?.includes("superadmin") ? "Global" : "Local"}
+                      </span>
+                      <span className="stat-label">Alcance</span>
+                    </div>
+                  </div>
+                  <div className="welcome-stat">
+                    <div className="stat-icon">🔐</div>
+                    <div className="stat-info">
+                      <span className="stat-number">Activa</span>
+                      <span className="stat-label">Sesión</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="welcome-glow"></div>
+            </div>
+          )}
+          
+          {/* Contenido principal */}
+          <main className="dashboard-content">
+            <Outlet />
+          </main>
+        </div>
       </div>
     </div>
   );
-};
+}
 
-export default DashboardLayout;

@@ -1,0 +1,564 @@
+/* ===== TOPBAR MODERNO ===== */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  background: rgba(15, 23, 42, 0.95);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+  backdrop-filter: blur(12px);
+  height: 64px;
+  box-sizing: border-box;
+  box-shadow: 0 4px 20px rgba(2, 6, 23, 0.3);
+  position: relative;
+  z-index: 100;
+}
+
+/* ===== LOGO Y NOMBRE DE EMPRESA ===== */
+.topbar__company {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.topbar__logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: linear-gradient(135deg, #3ab5ff, #36d1dc);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #0f172a;
+  font-weight: 700;
+  font-size: 18px;
+  text-transform: uppercase;
+  border: 2px solid rgba(148, 163, 184, 0.1);
+  box-shadow: 0 4px 12px rgba(58, 181, 255, 0.2);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.topbar__logo::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  transform: rotate(45deg);
+  transition: all 0.6s ease;
+  opacity: 0;
+}
+
+.topbar__logo:hover::before {
+  opacity: 1;
+  animation: shine 0.6s ease-in-out;
+}
+
+@keyframes shine {
+  0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+  100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+}
+
+.topbar__logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.topbar__company-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.topbar__company-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #f1f5f9;
+  margin: 0;
+  line-height: 1.2;
+  background: linear-gradient(135deg, #f1f5f9, #cbd5e1);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 10px rgba(58, 181, 255, 0.3);
+}
+
+.topbar__company-subtitle {
+  font-size: 11px;
+  color: #94a3b8;
+  margin: 0;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ===== CENTRO - BREADCRUMBS/TÍTULO ===== */
+.topbar__center {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 24px;
+}
+
+.topbar__page-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #cbd5e1;
+  margin: 0;
+  text-align: center;
+}
+
+.topbar__breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #94a3b8;
+}
+
+.topbar__breadcrumbs a {
+  color: #3ab5ff;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.topbar__breadcrumbs a:hover {
+  color: #36d1dc;
+}
+
+.topbar__breadcrumb-separator {
+  color: #64748b;
+  font-weight: 400;
+}
+
+/* ===== LADO DERECHO - USUARIO Y ACCIONES ===== */
+.topbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.topbar__notification {
+  position: relative;
+  padding: 8px;
+  border-radius: 8px;
+  background: rgba(148, 163, 184, 0.1);
+  color: #cbd5e1;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.topbar__notification:hover {
+  background: rgba(58, 181, 255, 0.1);
+  border-color: rgba(58, 181, 255, 0.3);
+  color: #3ab5ff;
+  transform: translateY(-1px);
+}
+
+.topbar__notification-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 8px;
+  height: 8px;
+  background: #ef4444;
+  border-radius: 50%;
+  border: 2px solid rgba(15, 23, 42, 0.95);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ===== USUARIO DROPDOWN ===== */
+.topbar__user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px 6px 6px;
+  border-radius: 12px;
+  background: rgba(148, 163, 184, 0.08);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.topbar__user:hover {
+  background: rgba(58, 181, 255, 0.1);
+  border-color: rgba(58, 181, 255, 0.3);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(58, 181, 255, 0.15);
+}
+
+.topbar__user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: linear-gradient(135deg, #64748b, #475569);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+  border: 2px solid rgba(148, 163, 184, 0.2);
+}
+
+.topbar__user-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.topbar__user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  text-align: left;
+}
+
+.topbar__user-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #f1f5f9;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.topbar__user-role {
+  font-size: 11px;
+  color: #94a3b8;
+  margin: 0;
+  text-transform: capitalize;
+}
+
+.topbar__user-dropdown {
+  margin-left: 4px;
+  color: #94a3b8;
+  font-size: 12px;
+  transition: transform 0.2s ease;
+}
+
+.topbar__user:hover .topbar__user-dropdown {
+  transform: rotate(180deg);
+  color: #3ab5ff;
+}
+
+/* ===== SEARCH BAR (OPCIONAL) ===== */
+.topbar__search {
+  display: flex;
+  align-items: center;
+  background: rgba(148, 163, 184, 0.08);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  border-radius: 10px;
+  padding: 8px 12px;
+  min-width: 280px;
+  transition: all 0.2s ease;
+}
+
+.topbar__search:focus-within {
+  background: rgba(58, 181, 255, 0.1);
+  border-color: rgba(58, 181, 255, 0.3);
+  box-shadow: 0 0 0 3px rgba(58, 181, 255, 0.1);
+}
+
+.topbar__search input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #f1f5f9;
+  font-size: 14px;
+  width: 100%;
+  padding: 2px 0;
+}
+
+.topbar__search input::placeholder {
+  color: #94a3b8;
+}
+
+.topbar__search-icon {
+  color: #94a3b8;
+  margin-right: 8px;
+  font-size: 16px;
+}
+
+.topbar__search:focus-within .topbar__search-icon {
+  color: #3ab5ff;
+}
+
+/* ===== STATUS INDICATORS ===== */
+.topbar__status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #94a3b8;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(148, 163, 184, 0.05);
+}
+
+.topbar__status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
+  animation: pulse 2s infinite;
+}
+
+.topbar__status-dot--warning {
+  background: #f59e0b;
+}
+
+.topbar__status-dot--error {
+  background: #ef4444;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 1024px) {
+  .topbar {
+    padding: 8px 16px;
+  }
+  
+  .topbar__search {
+    min-width: 200px;
+  }
+  
+  .topbar__center {
+    padding: 0 16px;
+  }
+  
+  .topbar__page-title {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 768px) {
+  .topbar {
+    padding: 8px 12px;
+  }
+  
+  .topbar__search {
+    display: none;
+  }
+  
+  .topbar__center {
+    display: none;
+  }
+  
+  .topbar__company-info {
+    display: none;
+  }
+  
+  .topbar__user-info {
+    display: none;
+  }
+  
+  .topbar__actions {
+    gap: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .topbar {
+    padding: 6px 8px;
+  }
+  
+  .topbar__logo {
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+  }
+  
+  .topbar__user-avatar {
+    width: 28px;
+    height: 28px;
+    font-size: 12px;
+  }
+  
+  .topbar__notification {
+    padding: 6px;
+  }
+}
+
+/* ===== EFECTOS ADICIONALES ===== */
+.topbar__glow {
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(58, 181, 255, 0.1), transparent);
+  animation: slide 8s ease-in-out infinite;
+}
+
+@keyframes slide {
+  0% { left: -100%; }
+  50% { left: 100%; }
+  100% { left: -100%; }
+}
+
+/* Efectos de hover mejorados */
+.topbar__interactive {
+  position: relative;
+  overflow: hidden;
+}
+
+.topbar__interactive::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background: radial-gradient(circle, rgba(58, 181, 255, 0.3) 0%, transparent 70%);
+  transition: all 0.3s ease;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.topbar__interactive:hover::after {
+  width: 100px;
+  height: 100px;
+}
+
+/* ===== LAYOUT CORRECTO ===== */
+.dashboard-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100%;
+  background: var(--bg-hero, #071022);
+  overflow: hidden;
+}
+
+.dashboard-main {
+  display: flex;
+  flex: 1;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Nueva área de contenido que incluye topbar y main */
+.dashboard-content-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Contenido principal que ocupa el resto del espacio */
+.dashboard-content {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--bg-hero, #071022);
+  padding: 20px; /* Añadimos espaciado interno */
+  margin-top: 8px; /* Separación del topbar */
+}
+
+/* ===== SIDEBAR ADJUSTMENTS ===== */
+.sidebar {
+  flex-shrink: 0;
+  height: 100%;
+  overflow-y: auto;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 1024px) {
+  .dashboard-main {
+    position: relative;
+  }
+  
+  /* En móvil, el sidebar se superpone */
+  .sidebar {
+    position: fixed;
+    z-index: 150;
+    height: 100vh;
+  }
+  
+  .dashboard-content-area {
+    width: 100%;
+    margin-left: 0;
+  }
+  
+  /* Overlay para cerrar sidebar en móvil */
+  .sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 140;
+    display: block;
+  }
+}
+
+@media (min-width: 1025px) {
+  .sidebar-overlay {
+    display: none;
+  }
+}
+
+/* ===== SCROLL IMPROVEMENTS ===== */
+.dashboard-content {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
+}
+
+.dashboard-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.dashboard-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dashboard-content::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 3px;
+}
+
+.dashboard-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5);
+}
+
+/* ===== CONTENT PADDING ===== */
+.dashboard-content .page {
+  padding: 0; /* Quitamos padding duplicado */
+  max-width: none;
+  margin: 0;
+  min-height: calc(100vh - 92px); /* Restar altura del topbar + margin */
+}
+
+@media (max-width: 768px) {
+  .dashboard-content {
+    padding: 16px;
+    margin-top: 6px;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-content {
+    padding: 12px;
+    margin-top: 4px;
+  }
+}

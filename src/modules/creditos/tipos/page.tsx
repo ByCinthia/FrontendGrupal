@@ -14,7 +14,7 @@ import type {
   ListTiposCreditoParams 
 } from "./types";
 import { useAuth } from "../../auth/service";
-import "../../../styles/unified-app.css";
+import "../../../styles/theme.css";
 
 const TiposCreditoPage: React.FC = () => {
   const { user } = useAuth();

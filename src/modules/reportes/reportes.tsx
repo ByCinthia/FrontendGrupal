@@ -1,6 +1,6 @@
 // src/modules/reportes/reportes.tsx
 import React, { useState } from "react";
-import "../../styles/dashboard.css";
+import "../../styles/theme.css";
 
 import type { ReportFilter, ReportData } from "./types";
 import { generateReport as apiGenerateReport, exportToCSVBlob, startVoiceRecognition,

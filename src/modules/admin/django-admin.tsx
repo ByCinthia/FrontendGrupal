@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../auth/service";
 import UsersPage from "../usuarios/page"; // ← USAR LA PÁGINA COMPLETA DE USUARIOS
-import "../../styles/unified-app.css";
+import "../../styles/theme.css";
 
 const DjangoAdminPage: React.FC = () => {
   const { user } = useAuth();

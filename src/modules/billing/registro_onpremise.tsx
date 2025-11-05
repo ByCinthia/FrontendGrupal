@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { http } from "../../shared/api/client";
-import "../../styles/dashboard.css";
+import "../../styles/theme.css";
 
 function formatDateInput(d: Date) {
   const yyyy = d.getFullYear();
@@ -315,3 +315,4 @@ const RegistroOnPremise: React.FC = () => {
 };
 
 export default RegistroOnPremise;
+

@@ -536,3 +536,266 @@ body,html { height:100%; margin:0; font-family: Inter, system-ui, -apple-system,
     font-size: 12px;
   }
 }
+
+
+/* ============================================
+   MODAL DE CONFIRMACIÓN (Company Register)
+   ============================================ */
+.confirmation-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  backdrop-filter: blur(4px);
+}
+
+.confirmation-modal-card {
+  width: min(900px, 96vw);
+  max-height: 90vh;
+  overflow: auto;
+  padding: 24px;
+  background: var(--card-bg);
+  border-radius: 14px;
+  border: var(--glass-border);
+  box-shadow: 0 24px 80px rgba(2,6,23,0.8);
+}
+
+.confirmation-modal-title {
+  margin: 0 0 20px;
+  color: #e6f7ff;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+/* Grid dos columnas */
+.confirmation-modal-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+/* Plan (columna izquierda) */
+.confirmation-modal-plan {
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: 20px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+}
+
+.plan-header {
+  margin-bottom: 16px;
+}
+
+.plan-title {
+  margin: 0 0 8px;
+  color: var(--accent);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.plan-price {
+  color: #e6f7ff;
+  font-weight: 700;
+  font-size: 20px;
+}
+
+/* Lista de características del plan */
+.plan-features-list {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.plan-features-list li {
+  margin-bottom: 8px;
+  padding-left: 4px;
+}
+
+.plan-summary {
+  margin-top: 16px;
+  font-size: 13px;
+  color: var(--muted);
+  padding-top: 16px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+/* Datos de empresa (columna derecha) */
+.confirmation-modal-company {
+  padding: 8px;
+}
+
+.company-section {
+  margin-bottom: 20px;
+}
+
+.company-title {
+  margin: 0 0 12px;
+  color: #e6f7ff;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.company-details p {
+  margin: 6px 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.company-details strong {
+  color: #e6f7ff;
+}
+
+/* Formulario de pago */
+.payment-form {
+  margin-top: 16px;
+}
+
+.payment-title {
+  margin: 0 0 16px;
+  color: #e6f7ff;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.form-field {
+  margin-bottom: 16px;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 6px;
+  color: #e6f7ff;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.form-input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: #e6f7ff;
+  font-size: 14px;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: rgba(255,255,255,0.05);
+}
+
+.form-input::placeholder {
+  color: var(--muted);
+}
+
+.form-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.form-col {
+  flex: 1;
+}
+
+.form-col-small {
+  width: 100px;
+}
+
+.payment-note {
+  margin-top: 16px;
+  font-size: 12px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* Warning para plan de pago */
+.payment-warning {
+  margin-top: 16px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: rgba(255,193,7,0.1);
+  border: 1px solid rgba(255,193,7,0.2);
+  color: #ffd23f;
+  font-size: 14px;
+}
+
+/* Acciones del modal */
+.confirmation-modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+/* Botones - reutiliza los existentes pero con ajustes */
+.ui-btn {
+  padding: 12px 20px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.ui-btn--ghost {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.1);
+  color: var(--muted);
+}
+
+.ui-btn--ghost:hover {
+  background: rgba(255,255,255,0.05);
+  color: #e6f7ff;
+}
+
+.ui-btn--primary {
+  background: linear-gradient(90deg, var(--accent), #36d1dc);
+  color: #031026;
+}
+
+.ui-btn--primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(58,181,255,0.3);
+}
+
+.ui-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .confirmation-modal-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  
+  .confirmation-modal-card {
+    padding: 20px;
+    margin: 10px;
+  }
+  
+  .confirmation-modal-actions {
+    flex-direction: column;
+  }
+  
+  .ui-btn {
+    width: 100%;
+  }
+}
+

@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/service";
-import type { RegistrationForm, AdminUserData } from "./types";
-import "../../styles/auth.css";
+import type { RegistrationForm, } from "./types";
+import "../../styles/theme.css";
 import "../../styles/landing.css";
 
-import SubscriptionPanel from "../billing/subscriptionPanel";
-import { listPlans } from "../billing/service";
-import type { Plan, SuscripcionResponse } from "../billing/types";
+// reemplazo: usar ConfirmationModal en lugar de SubscriptionPanel para confirmar + pago
+import { ConfirmationModal } from "../billing/ConfirmationModal";
+import { listPlans, createSuscripcion } from "../billing/service";
+import type { Plan } from "../billing/types";
 
 /** Permitir que el host proporcione una función de subida opcional */
 declare global {
@@ -16,31 +17,21 @@ declare global {
   }
 }
 
-/** Tipos locales */
-type CreatedEmpresa = {
-  empresa_id?: number;
-  empresaInfo?: {
-    razon_social: string;
-    nombre_comercial: string;
-  } | null;
-  user?: AdminUserData | null;
-};
+// Tipos para la respuesta esperada del backend
+interface BackendEmpresa {
+  id?: number | string;
+  [k: string]: unknown;
+}
 
-type RegisterResponse = {
-  success?: boolean;
-  empresa_id?: number | string;
+interface BackendRegisterRaw {
   message?: string;
-  user?: AdminUserData | null;
-};
-
-function isRegisterResponse(obj: unknown): obj is RegisterResponse {
-  if (!obj || typeof obj !== "object") return false;
-  const o = obj as Record<string, unknown>;
-  return (
-    ("success" in o && typeof o.success === "boolean") ||
-    "empresa_id" in o ||
-    "message" in o
-  );
+  empresa?: BackendEmpresa;
+  data?: { empresa?: BackendEmpresa; [k: string]: unknown };
+  empresa_id?: number | string;
+  user?: unknown; // Cambiar de AdminUserData a unknown para evitar conflictos de tipos
+  perfil_user?: unknown;
+  token?: string;
+  success?: boolean;
 }
 
 /** Helper de subida: si existe window.uploadFile la usa; si no, simula una URL */
@@ -85,8 +76,9 @@ const CompanyRegisterPage: React.FC = () => {
   const [userAvatarFile, setUserAvatarFile] = useState<File | null>(null);
   const [userAvatarPreview, setUserAvatarPreview] = useState<string | null>(form.imagen_url_perfil || null);
 
-  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
-  const [createdEmpresa, setCreatedEmpresa] = useState<CreatedEmpresa | null>(null);
+  // Modal de confirmación
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+  const [preparedRegistrationData, setPreparedRegistrationData] = useState<Omit<RegistrationForm, "confirm_password"> | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -95,17 +87,13 @@ const CompanyRegisterPage: React.FC = () => {
         const list = await listPlans();
         if (mounted && Array.isArray(list)) {
           setPlans(list);
-          if (!selectedPlanId && list.length > 0) setSelectedPlanId(list[0].id);
+          setSelectedPlanId(prev => prev || (list.length > 0 ? list[0].id : "basico"));
         }
-      } catch (err) {
-        console.warn("[landing] no se pudieron cargar planes:", err);
-      }
+      } catch (err) { console.warn(err); }
     }
     void load();
-    return () => {
-      mounted = false;
-    };
-  }, []); // cargar una sola vez
+    return () => { mounted = false; };
+  }, []);
 
   // gestionar previews y archivos (empresa / usuario)
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, target: "company" | "user") => {
@@ -169,26 +157,28 @@ const CompanyRegisterPage: React.FC = () => {
     return null;
   };
 
+  // FUNCIÓN 1: Solo validar y preparar datos para el modal (NO crear empresa)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setMessage({ text: "", type: "" });
 
-    try {
-      const validationError = validateForm();
-      if (validationError) {
-        setMessage({ text: validationError, type: "error" });
-        setLoading(false);
-        return;
-      }
+    // 1. Validar formulario
+    const validationError = validateForm();
+    if (validationError) {
+      setMessage({ text: validationError, type: "error" });
+      return;
+    }
 
-      // subir imágenes si hay archivos seleccionados
+    setLoading(true);
+    try {
+      // 2. Subir imágenes (opcional, puede hacerse después)
       let uploadedCompanyLogo = form.imagen_url_empresa || "";
       let uploadedUserAvatar = form.imagen_url_perfil || "";
 
       if (companyLogoFile) {
         try {
           uploadedCompanyLogo = await uploadImage(companyLogoFile);
+          console.log("[preparación] Logo empresa subido:", uploadedCompanyLogo);
         } catch (err) {
           console.warn("No se pudo subir logo de empresa:", err);
         }
@@ -197,11 +187,13 @@ const CompanyRegisterPage: React.FC = () => {
       if (userAvatarFile) {
         try {
           uploadedUserAvatar = await uploadImage(userAvatarFile);
+          console.log("[preparación] Avatar usuario subido:", uploadedUserAvatar);
         } catch (err) {
           console.warn("No se pudo subir avatar de usuario:", err);
         }
       }
 
+      // 3. Preparar datos para el modal (SIN crear empresa)
       const registrationData = {
         razon_social: form.razon_social,
         email_contacto: form.email_contacto,
@@ -216,50 +208,232 @@ const CompanyRegisterPage: React.FC = () => {
         selected_plan: selectedPlanId || form.selected_plan,
       };
 
-      const raw = await registerCompanyAndUser(registrationData);
-      if (!isRegisterResponse(raw)) {
-        setMessage({ text: "Respuesta inesperada del servidor.", type: "error" });
-        setLoading(false);
-        return;
-      }
+      console.log("[preparación] Datos preparados para confirmación:", registrationData);
 
-      const resp = raw as RegisterResponse;
-
-      if (resp.success && resp.empresa_id !== undefined) {
-        setCreatedEmpresa({
-          empresa_id: Number(resp.empresa_id),
-          empresaInfo: { razon_social: registrationData.razon_social, nombre_comercial: registrationData.nombre_comercial },
-          user: resp.user ?? null,
-        });
-        setShowSubscriptionModal(true);
-        setMessage({ text: "Empresa creada. Configure la suscripción en la ventana emergente.", type: "success" });
-      } else {
-        setMessage({ text: resp.message || "Error al registrar empresa", type: "error" });
-      }
-    } catch (error) {
-      console.error("Error en registro:", error);
-      setMessage({ text: "Error al registrar. Intente nuevamente.", type: "error" });
+      // 4. Mostrar modal de confirmación
+      setPreparedRegistrationData(registrationData);
+      setShowConfirmationModal(true);
+      setMessage({ text: "Datos validados. Confirma en la siguiente ventana para crear la empresa.", type: "success" });
+      
+    } catch (err) {
+      console.error("[preparación] Error:", err);
+      setMessage({ text: "Error preparando los datos. Inténtalo de nuevo.", type: "error" });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSubscriptionSuccess = (subscription: SuscripcionResponse) => {
-    setShowSubscriptionModal(false);
-    navigate("/planes-seleccion", {
-      state: {
-        empresa_id: createdEmpresa?.empresa_id,
-        subscription,
-        user: createdEmpresa?.user ?? undefined,
-      },
-      replace: true,
-    });
+  // FUNCIÓN 2: Crear empresa y suscripción SOLO al confirmar en el modal
+  const handleConfirmRegistration = async (paymentData?: { cardNumber: string; expiryDate: string; cvv: string; cardName: string }) => {
+    if (!preparedRegistrationData) {
+      console.error("[confirmación] No hay datos preparados");
+      return;
+    }
+
+    setLoading(true);
+    setMessage({ text: "", type: "" });
+
+    try {
+      console.log("[confirmación] INICIANDO creación de empresa desde modal");
+      
+      // 1. Preparar payload para el backend
+      const payload = {
+        razon_social: String(preparedRegistrationData.razon_social || ""),
+        email_contacto: String(preparedRegistrationData.email_contacto || ""),
+        nombre_comercial: String(preparedRegistrationData.nombre_comercial || ""),
+        imagen_url_empresa: String(preparedRegistrationData.imagen_url_empresa || ""),
+        username: String(preparedRegistrationData.username || ""),
+        password: String(preparedRegistrationData.password || ""),
+        first_name: String(preparedRegistrationData.first_name || ""),
+        last_name: String(preparedRegistrationData.last_name || ""),
+        email: String(preparedRegistrationData.email || ""),
+        imagen_url_perfil: String(preparedRegistrationData.imagen_url_perfil || ""),
+      };
+
+      // AÑADIR: Verificar que no hay campos vacíos problemáticos
+      console.log("[confirmación] Tipos verificados:", Object.keys(payload).map(k => `${k}: ${typeof payload[k as keyof typeof payload]}`));
+      console.log("[confirmación] Payload para crear empresa:", JSON.stringify(payload, null, 2));
+
+      // 2. CREAR EMPRESA Y USUARIO (aquí sí se ejecuta el registro)
+      const raw: BackendRegisterRaw = await registerCompanyAndUser(payload);
+      console.log("[confirmación] Respuesta del backend:", raw);
+
+      // Normalizar respuesta: backend devuelve { message, empresa: { id } , ... }
+      if (!raw || typeof raw !== "object") {
+        throw new Error("Respuesta inválida del servidor");
+      }
+
+      const empresaObj = raw.empresa ?? raw.data?.empresa ?? null;
+      const empresaIdRaw = empresaObj?.id ?? raw.empresa_id ?? null;
+
+      if (!empresaIdRaw) {
+        // si backend devolvió sólo message/token, considerarlo éxito pero sin id -> error controlado
+        throw new Error(raw.message || "No se recibió ID de empresa del servidor");
+      }
+
+      const empresaId = typeof empresaIdRaw === "string" ? parseInt(empresaIdRaw, 10) : Number(empresaIdRaw);
+      if (isNaN(empresaId) || empresaId <= 0) {
+        throw new Error(`empresa_id inválido recibido: ${empresaIdRaw}`);
+      }
+
+      console.log("[confirmación] ✅ Empresa creada exitosamente con ID:", empresaId);
+      
+      // Mostrar mensaje de éxito inmediatamente después de crear la empresa
+      setMessage({ text: "¡Empresa registrada exitosamente! Configurando suscripción...", type: "success" });
+
+      // 4. Procesar pago si es necesario
+      if (paymentData) {
+        console.log("[confirmación] Procesando pago:", paymentData);
+        // TODO: Integrar con pasarela de pago real
+      }
+
+      // 5. Crear suscripción
+      let sus = null;
+      let suscripcionExitosa = false;
+      try {
+        console.log("[confirmación] Creando suscripción para plan:", selectedPlanId);
+        
+        const tipoPlan = selectedPlanId === "basico" ? "BASICO" : "PREMIUM";
+        
+        const fechaInicioDate = new Date();
+        const fechaFinDate = new Date(fechaInicioDate);
+        if (selectedPlanId === "basico") {
+          fechaFinDate.setDate(fechaFinDate.getDate() + 30); // 30 días trial
+        } else {
+          fechaFinDate.setFullYear(fechaFinDate.getFullYear() + 1); // 1 año
+        }
+
+        const planObj = plans.find(p => p.id === selectedPlanId);
+        const rawPrice = planObj?.priceUsd ?? 0;
+        const monto = typeof rawPrice === 'string' ? parseFloat(rawPrice) : Number(rawPrice);
+
+        const suscripcionPayload = {
+          empresa: empresaId,
+          tipo_plan: tipoPlan,
+          fecha_inicio: fechaInicioDate.toISOString().split("T")[0],
+          fecha_fin: fechaFinDate.toISOString().split("T")[0],
+          monto: isNaN(monto) ? 0 : monto,
+          estado: true,
+          metodo_pago: paymentData ? "TARJETA" : "MANUAL",
+        };
+
+        console.log("[confirmación] Creando suscripción:", JSON.stringify(suscripcionPayload, null, 2));
+        sus = await createSuscripcion(suscripcionPayload);
+        console.log("[confirmación] ✅ Suscripción creada:", sus);
+        suscripcionExitosa = true;
+
+      } catch (subError) {
+        console.error("[confirmación] Error creando suscripción:", subError);
+        console.warn("[confirmación] Empresa creada pero suscripción falló. Continuando...");
+        // No fallar todo por la suscripción - la empresa ya está creada
+      }
+
+      // 6. Éxito total
+      setShowConfirmationModal(false);
+      
+      // Mensaje final según el resultado
+      if (suscripcionExitosa) {
+        setMessage({ text: "¡Empresa y suscripción registradas exitosamente!", type: "success" });
+      } else {
+        setMessage({ text: "¡Empresa registrada exitosamente! (Suscripción se configurará después)", type: "success" });
+      }
+      
+      setTimeout(() => {
+        navigate("/login", { 
+          state: { 
+            message: suscripcionExitosa 
+              ? "Empresa y suscripción creadas exitosamente. Puede iniciar sesión." 
+              : "Empresa creada exitosamente. Puede iniciar sesión.",
+            empresa_id: empresaId 
+          },
+          replace: true 
+        });
+      }, 3000); // Más tiempo para leer el mensaje
+
+    } catch (error: unknown) {
+      console.error("[confirmación] Error:", error);
+      
+      // Manejo de errores de Axios mejorado
+      interface AxiosError {
+        response?: {
+          data?: {
+            errors?: Record<string, unknown>;
+            message?: string;
+            detail?: string;
+            error?: string;
+          };
+          status?: number;
+          statusText?: string;
+        };
+        message?: string;
+      }
+      
+      const axiosError = error as AxiosError;
+      const respData = axiosError?.response?.data;
+      const status = axiosError?.response?.status;
+      const statusText = axiosError?.response?.statusText;
+      
+      console.error("[confirmación] Detalles del error:", {
+        status,
+        statusText,
+        data: respData,
+        message: axiosError?.message
+      });
+      
+      if (respData?.errors) {
+        const errorParts: string[] = [];
+        
+        Object.entries(respData.errors).forEach(([field, msgs]) => {
+          if (Array.isArray(msgs)) {
+            errorParts.push(`${field}: ${msgs.join(", ")}`);
+          }
+        });
+        
+        setMessage({ text: errorParts.join(" | "), type: "error" });
+        
+        // Si hay error de username/email, cerrar modal para editar
+        if (respData.errors.username || respData.errors.email) {
+          if (respData.errors.username) {
+            const suggestion = `${preparedRegistrationData.username}_${Math.floor(Math.random() * 9000 + 1000)}`;
+            setForm(prev => ({ ...prev, username: suggestion }));
+          }
+          setShowConfirmationModal(false);
+          setPreparedRegistrationData(null);
+        }
+        return;
+      }
+      
+      // Manejo de errores 500 del servidor
+      if (status === 500) {
+        const serverError = respData?.error || respData?.message || "Error interno del servidor";
+        setMessage({ 
+          text: `Error del servidor (${status}): ${serverError}. Revisa los logs del backend.`, 
+          type: "error" 
+        });
+        return;
+      }
+      
+      // Otros errores HTTP
+      if (status && status >= 400) {
+        setMessage({ 
+          text: `Error ${status}: ${statusText || "Error del servidor"}. ${respData?.message || ""}`, 
+          type: "error" 
+        });
+        return;
+      }
+      
+      const msg = respData?.message || respData?.detail || respData?.error || "Error del servidor";
+      setMessage({ text: String(msg), type: "error" });
+      
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <section className="landing-hero">
       <div className="auth-box-modern" role="main">
-        {/* Planes: usa estilos de landing.css (.plans-sidebar + .plan-sidebar-card) */}
+        {/* Planes */}
         <aside className="plans-sidebar" aria-label="Seleccionar plan">
           <div className="plans-sidebar__header">
             <h3 className="plans-sidebar__title">Planes</h3>
@@ -296,11 +470,11 @@ const CompanyRegisterPage: React.FC = () => {
           </div>
 
           <div className="plans-sidebar__footer" style={{ marginTop: 12 }}>
-            <small className="muted">Tras crear la empresa podrás confirmar la suscripción.</small>
+            <small className="muted">Tras validar los datos podrás confirmar el registro.</small>
           </div>
         </aside>
 
-        {/* Formulario: usa .auth-right */}
+        {/* Formulario */}
         <div className="auth-right" aria-label="Formulario de registro">
           <form onSubmit={handleSubmit} className="auth-form-modern" noValidate>
             <h2>Registro de Empresa</h2>
@@ -387,7 +561,7 @@ const CompanyRegisterPage: React.FC = () => {
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
               <button type="submit" className="ui-btn ui-btn--primary" disabled={loading}>
-                {loading ? "Registrando empresa..." : "Registrar Empresa"}
+                {loading ? "Validando datos..." : "Validar y Continuar"}
               </button>
               <div style={{ textAlign: "right" }}>
                 <small style={{ color: "var(--muted)" }}>¿Ya tienes una cuenta?</small>
@@ -400,19 +574,22 @@ const CompanyRegisterPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Modal: SubscriptionPanel para confirmar el plan y crear suscripción */}
-      {showSubscriptionModal && createdEmpresa && (
-        <SubscriptionPanel
-          empresaId={createdEmpresa.empresa_id!}
-          empresaInfo={createdEmpresa.empresaInfo!}
-          selectedPlan={selectedPlanId}
-          plans={plans}
-          onSuccess={handleSubscriptionSuccess}
-          onCancel={() => {
-            setShowSubscriptionModal(false);
-            navigate("/login");
+      {/* Modal de confirmación - AQUÍ se crea la empresa */}
+      {showConfirmationModal && preparedRegistrationData && (
+        <ConfirmationModal
+          companyData={{
+            nombre: String(preparedRegistrationData.nombre_comercial ?? ""),
+            email: String(preparedRegistrationData.email_contacto ?? ""),
+            telefono: "",
+            direccion: "",
+            admin_nombre: String(preparedRegistrationData.first_name ?? ""),
+            admin_email: String(preparedRegistrationData.email ?? ""),
           }}
-          allowSkip={false}
+          selectedPlan={plans.find(p => p.id === selectedPlanId)}
+          isPaidPlan={selectedPlanId !== "basico"}
+          onConfirm={(paymentData) => void handleConfirmRegistration(paymentData)}
+          onCancel={() => setShowConfirmationModal(false)}
+          loading={loading}
         />
       )}
     </section>

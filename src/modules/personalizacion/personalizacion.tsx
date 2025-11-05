@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { http } from "../../shared/api/client";
 import { useAuth } from "../auth/service";
-import "../../styles/dashboard.css";
+import "../../styles/theme.css";
 import "../../styles/config.css"; // ← Importar las nuevas clases CSS
 
 interface PersonalizationSettings {

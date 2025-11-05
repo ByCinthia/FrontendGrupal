@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom"; // Añadir esta importación
 import { listUsers, setUserActive } from "./service";
 import type { User } from "./types";
-import "../../../src/styles/users.css";
+import "../../styles/usuarios.css";
 import { useAuth } from "../../modules/auth/service"; // Corregir la ruta de importación
 
 import UserEditModal from "./components/UserEditModal";

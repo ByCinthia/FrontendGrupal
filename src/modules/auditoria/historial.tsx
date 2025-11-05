@@ -1,6 +1,6 @@
 // src/modules/auditoria/historial.tsx
 import React, { useState, useEffect } from "react";
-import "../../styles/dashboard.css";
+import "../../styles/theme.css";
 
 interface AuditLog {
   id: string;
