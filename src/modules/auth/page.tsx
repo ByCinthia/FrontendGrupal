@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "./service";
-import "../../styles/theme.css";
+import "../../styles/login.css";
 
 const AuthPage: React.FC = () => {
   const { login, user } = useAuth();
@@ -78,15 +78,23 @@ const AuthPage: React.FC = () => {
   };
 
   const fillCompanyAdminCredentials = () => {
-    setLoginData({ email: "vagner@gmail.com", password: "sssssssssssssssssssss" });
+    setLoginData({ email: "vagner@gmail.com", password: "ssssssssssssss" });
   };
 
   const companyRegisterUrl = `/registro-empresa?from=auth&redirect=${encodeURIComponent(getRedirect())}`;
 
+  // Usa una URL directa a una imagen. Reemplaza por la tuya si quieres.
+  const illustrationUrl = "https://www.stelorder.com/wp-content/uploads/2024/04/gestion_empresarial_2.jpg";
+
   return (
     <div className="auth-container">
       <div className="auth-box-modern">
-        <div className="auth-left"><div className="auth-image" /></div>
+        <div className="auth-left">
+          <div className="auth-image" style={{ backgroundImage: `url("${illustrationUrl}")` }} />
+          <div className="overlay-content">
+          
+          </div>
+        </div>
 
         <div className="auth-right">
           {/* Mostrar si ya está logueado */}

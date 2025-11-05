@@ -16,9 +16,11 @@ import CompanySignupPage from "./modules/landing/company_register";
 import UsersPage from "./modules/usuarios/page";
 import GestionUsuariosRoles from "./modules/usuarios/gestion_usuarios_roles"; // ← Solo esta
 import CreditsPage from "./modules/creditos/page";
-import SolicitarCredito from "./modules/creditos/solicitar";
 import PagosPage from "./modules/pagos/page";
 import EmpresaPage from "./modules/empresa/page";
+import ClientesPage from "./modules/clientes/page";
+import HistorialClientesPage from "./modules/clientes/historial";
+import CrearClientePage from "./modules/clientes/crear_cliente";
 
 // Pages - Billing
 import RegistroOnPremise from "./modules/billing/registro_onpremise";
@@ -35,6 +37,24 @@ import { Link } from "react-router-dom";
 import "./styles/theme.css";
 import "./shared/layout/topbar.css";
 import TiposCreditoPage from "./modules/creditos/tipos/page";
+import CrearCreditoPage from "./modules/creditos/crear_creditos";
+import HistorialCreditosPage from "./modules/creditos/historial";
+
+/* RequireRole: componente compacto para proteger rutas por rol */
+type RequireRoleProps = {
+  children: React.ReactElement;
+  roles: string[];
+  redirectTo?: string;
+};
+
+const RequireRole: React.FC<RequireRoleProps> = ({ children, roles, redirectTo = "/app" }) => {
+  const { user } = useAuth();
+  // no autenticado -> a login (el layout /app ya usa RequireAuth, pero añadimos chequeo seguro)
+  if (!user) return <Navigate to="/login" replace />;
+  const userRoles = Array.isArray(user.roles) ? user.roles.map(String) : [];
+  const allowed = roles.some(r => userRoles.includes(r));
+  return allowed ? children : <Navigate to={redirectTo} replace />;
+};
 
 // Componente de inicio mejorado
 export function Inicio() {
@@ -177,6 +197,10 @@ const router = createBrowserRouter([
       { index: true, element: <Inicio /> },
       { path: "empresas", element: <EmpresaPage /> },
       { path: "usuarios", element: <UsersPage /> },
+      { path: "clientes", element: <ClientesPage />, children: [
+          { index: true, element: <HistorialClientesPage /> },
+          { path: "crear", element: <CrearClientePage /> },
+        ] },
       { path: "gestion-usuarios", element: <GestionUsuariosRoles /> }, // ← Solo esta ruta
       { path: "actividades", element: <HistorialActividadesPage /> },
       { path: "auditoria", element: <HistorialAuditoriaPage /> },
@@ -188,8 +212,9 @@ const router = createBrowserRouter([
         path: "creditos",
         element: <CreditsPage />,
         children: [
-          { path: "solicitar", element: <SolicitarCredito /> },
-          { path: "tipos", element: <TiposCreditoPage /> },
+          { index: true, element: <HistorialCreditosPage /> },
+          { path: "crear", element: <CrearCreditoPage /> },
+          { path: "tipos", element: <RequireRole roles={["admin","superadmin"]}><TiposCreditoPage /></RequireRole> },
         ],
       },
       { path: "pagos", element: <PagosPage /> },

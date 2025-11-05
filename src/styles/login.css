@@ -1,0 +1,266 @@
+/* Estilos específicos para la pantalla de login (independiente de landing.css) */
+:root{
+  --login-bg: linear-gradient(180deg,#061026 0%, #07101a 100%);
+  --card-bg: rgba(8,14,28,.75);
+  --muted: #94a3b8;
+  --accent: #3ab5ff;
+  --btn-primary: linear-gradient(90deg,#3ab5ff,#36d1dc);
+  --text: #e6eef8;
+  --glass-border: 1px solid rgba(255,255,255,0.03);
+  --radius: 12px;
+}
+
+/* fallback visual si no hay imagen */
+:root { --auth-image-fallback: radial-gradient(circle at 20% 20%, rgba(58,181,255,0.12), transparent 20%), linear-gradient(135deg, rgba(11,19,36,.8), rgba(6,10,20,.7)); }
+
+html,body { height:100%; margin:0; font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background: var(--login-bg); color: var(--text); }
+
+/* Contenedor centrado */
+.auth-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  box-sizing: border-box;
+}
+
+/* Caja principal del auth */
+.auth-box-modern {
+  min-height: 420px;
+  display: grid;
+  grid-template-columns: 420px 1fr;
+  gap: 20px;
+  align-items: stretch;
+}
+
+/* Panel izquierdo decorativo */
+.auth-left{
+  padding: 0;
+  border-radius: var(--radius);
+  overflow: hidden;
+  position: relative;
+  min-height: 420px;
+  display: block;
+}
+
+/* Imagen que cubre todo el panel izquierdo */
+.auth-image {
+  position: absolute;
+  inset: 0; /* top:0; right:0; bottom:0; left:0; */
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  /* mantener borde redondeado del contenedor */
+  border-radius: inherit;
+  z-index: 0;
+}
+
+/* Contenido sobre la imagen (texto/branding) */
+.auth-left .overlay-content {
+  position: relative;
+  z-index: 2;
+  padding: 20px;
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+  justify-content: flex-end; /* o center según prefieras */
+  background: linear-gradient(180deg, rgba(0,0,0,0.0) 0%, rgba(0,0,0,0.30) 60%); /* sutil degradado para legibilidad */
+}
+
+/* Panel derecho (formulario) */
+.auth-right{
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  padding: 20px;
+  border: var(--glass-border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Formulario */
+.auth-form-modern {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.auth-form-modern h2 { margin: 0 0 6px 0; font-size: 20px; }
+.auth-form-modern p { margin: 0 0 12px 0; color: var(--muted); font-size: 13px; }
+
+.input-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.input-group input,
+.input-group select,
+.input-group textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.04);
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+}
+
+.input-icon { font-size: 14px; color: var(--muted); cursor: default; }
+
+/* Buttons */
+.auth-button-modern {
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: none;
+  background: var(--btn-primary);
+  
+  color: #ffffff; /* texto blanco */
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.12s ease;
+}
+
+.auth-button-modern:disabled { opacity: .7; cursor: not-allowed; transform: none; }
+.auth-button-modern:hover { transform: translateY(-2px); }
+
+/* Small utility buttons */
+.ghost-btn { background: transparent; border: 1px solid rgba(255,255,255,0.04); color: var(--muted); padding: 8px 10px; border-radius: 8px; cursor: pointer; }
+
+/* Mensajes */
+.message { padding: 10px; border-radius: 8px; margin-bottom: 8px; font-size: 14px; }
+.message.success { background: rgba(16,185,129,0.12); color: #7ee6b7; }
+.message.error { background: rgba(239,68,68,0.08); color: #ffcccc; }
+
+/* Clases UI básicas heredadas del landing (para mantener consistencia visual) */
+.ui-title {
+  font-size: 32px;
+  font-weight: 700;
+  margin: 0 0 8px 0;
+  color: var(--text);
+  background: var(--accent);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  position: relative;
+  z-index: 2;
+}
+
+.ui-subtitle {
+  color: var(--muted);
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  max-width: 520px;
+}
+
+/* Botones reutilizables */
+.ui-btn {
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  transition: transform .12s ease;
+  background: linear-gradient(90deg,#3ab5ff,#36d1dc);
+  color: #ffffff; /* texto blanco */
+}
+.ui-btn--ghost {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.04);
+  color: #ffffff; /* texto blanco */
+}
+.ui-btn--primary {
+  background: linear-gradient(90deg,#3ab5ff,#36d1dc);
+  color: #ffffff; /* texto blanco */
+}
+
+/* efecto glow para botones */
+.ui-btn,
+.auth-button-modern {
+  position: relative;
+  z-index: 1;
+  overflow: visible;
+  border-radius: 10px;
+  transition: transform .12s ease, box-shadow .12s ease, filter .12s ease;
+  /* sombra base sutil */
+  box-shadow: 0 6px 18px rgba(59,181,255,0.10), 0 2px 6px rgba(3,16,38,0.06);
+}
+
+/* pseudo-elemento para el brillo difuso detrás */
+.ui-btn::before,
+.auth-button-modern::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(1);
+  width: 140%;
+  height: 140%;
+  pointer-events: none;
+  border-radius: inherit;
+  background: radial-gradient(circle at 50% 40%, rgba(58,181,255,0.20) 0%, rgba(58,181,255,0.08) 30%, transparent 60%);
+  filter: blur(12px);
+  opacity: 0.6;
+  z-index: -1;
+  transition: opacity .12s ease, transform .12s ease, filter .12s ease;
+}
+
+/* hover: levantar y aumentar brillo */
+.ui-btn:hover,
+.auth-button-modern:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 36px rgba(59,181,255,0.18), 0 6px 18px rgba(3,16,38,0.10);
+}
+.ui-btn:hover::before,
+.auth-button-modern:hover::before {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1.08);
+  filter: blur(14px);
+}
+
+/* active / focus: efecto más intenso momentáneo */
+.ui-btn:active,
+.auth-button-modern:active,
+.ui-btn:focus,
+.auth-button-modern:focus {
+  transform: translateY(0);
+  box-shadow: 0 8px 24px rgba(59,181,255,0.22), 0 4px 12px rgba(3,16,38,0.12);
+}
+.ui-btn:active::before,
+.auth-button-modern:active::before,
+.ui-btn:focus::before,
+.auth-button-modern:focus::before {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1.12);
+  filter: blur(16px);
+}
+
+/* variante más suave para botones ghost */
+.ui-btn--ghost::before {
+  background: radial-gradient(circle at 50% 40%, rgba(255,255,255,0.06) 0%, transparent 40%);
+  opacity: 0.45;
+}
+
+/* pequeñas utilidades del auth */
+.auth-row {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+}
+.remember { font-size:13px; color:var(--muted); display:flex; gap:8px; align-items:center; }
+.forgot-password { color:var(--muted); font-size:13px; text-decoration:none; }
+
+/* Responsive: apilar en pantallas pequeñas */
+@media (max-width: 920px) {
+  .auth-box-modern { grid-template-columns: 1fr; width: min(680px, 96vw); }
+  .auth-left { order: -1; min-height: 160px; display: none; } /* ocultar opcionalmente la ilustración para pantallas pequeñas */
+  .auth-button-modern { width: 100%; }
+}

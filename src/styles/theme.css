@@ -463,3 +463,112 @@ body {
     flex-wrap: wrap;
   }
 }
+
+/* -----------------------
+   Estilos por módulo
+   ----------------------- */
+/* Normalizar apariencia de la sección de contenido para módulos (sin fondo blanco fuerte) */
+.module-page .ui-tab-content {
+  background: transparent; /* no card blanco */
+  box-shadow: none;        /* quitar sombras fuertes */
+  border-radius: 0;
+  padding: 0;
+}
+
+/* Ajuste específico para Créditos si hacía falta quitar algún brillo */
+.module-page.module-creditos .ui-tab-content {
+  background: var(--surface, transparent);
+  color: var(--text, inherit);
+}
+
+/* Mantener consistencia con otros módulos: card interior si se requiere */
+.module-page .ui-card {
+  background: var(--card-bg, rgba(255,255,255,0.02));
+  box-shadow: var(--card-shadow, 0 6px 18px rgba(2,6,23,0.25));
+  border-radius: 10px;
+}
+
+/* Modal oscuro para Tipos de Crédito */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(2,6,23,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+/* Ventana modal */
+.tipos-modal {
+  background: var(--card-bg, rgba(8,14,28,0.85));
+  color: var(--text, #e6eef8);
+  border-radius: 12px;
+  padding: 24px;
+  width: 90%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow: auto;
+  box-shadow: 0 16px 48px rgba(2,6,23,0.6);
+  border: 1px solid rgba(255,255,255,0.04);
+}
+
+/* Encabezados y textos */
+.tipos-modal h3 {
+  color: var(--text-muted, #e6eef8);
+  margin-bottom: 12px;
+}
+
+/* Inputs y textarea */
+.tipos-modal input[type="text"],
+.tipos-modal input[type="number"],
+.tipos-modal textarea {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.06);
+  color: var(--text, #e6eef8);
+  outline: none;
+  box-shadow: none;
+}
+
+.tipos-modal input::placeholder,
+.tipos-modal textarea::placeholder {
+  color: rgba(255,255,255,0.42);
+}
+
+/* Labels */
+.tipos-modal label {
+  color: rgba(255,255,255,0.86);
+  font-weight: 600;
+  display: block;
+  margin-bottom: 6px;
+}
+
+/* Botones dentro del modal */
+.tipos-modal .ui-btn {
+  background: linear-gradient(90deg, #2563eb 0%, #7c3aed 100%);
+  color: #ffffff;
+  box-shadow: 0 8px 24px rgba(37,99,235,0.14);
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: none;
+}
+
+.tipos-modal .ui-btn.ui-btn--ghost {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.06);
+  color: #ffffff;
+}
+
+/* Botones pequeños (acciones) */
+.tipos-modal button[style] { /* conserva estilos inline pequeños pero asegura contraste */
+  color: #ffffff;
+}
+
+/* Ajustes responsive */
+@media (max-width: 520px) {
+  .tipos-modal { padding: 16px; max-width: 92vw; }
+}
