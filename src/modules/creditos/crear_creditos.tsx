@@ -36,60 +36,95 @@ const CrearCreditoPage: React.FC = () => {
     void (async () => {
       try {
         setLoadingMeta(true);
+        console.log("🔄 Cargando datos para formulario...");
         const [c, tt] = await Promise.all([listClients(), listCreditTypes()]);
+        
+        console.log("✅ Clientes cargados:", c.length);
+        console.log("✅ Tipos de crédito cargados:", tt.length);
+        
         setClientes(c);
         setTipos(tt);
-        if (c.length > 0) setForm(prev => ({ ...prev, cliente_id: String(c[0].id) }));
-      } catch {
-        setError("No se pudieron cargar datos previos");
+        
+        // No pre-seleccionar cliente automáticamente
+        // if (c.length > 0) setForm(prev => ({ ...prev, cliente_id: String(c[0].id) }));
+      } catch (err) {
+        console.error("❌ Error cargando datos:", err);
+        setError("No se pudieron cargar los datos necesarios. Verifique la conexión.");
       } finally {
         setLoadingMeta(false);
       }
     })();
   }, []);
 
+  // Mejorar filtro de clientes (buscar por nombre, apellido o teléfono)
+  const filteredClientes = clientes.filter(c => {
+    if (!clienteInputValue.trim()) return true;
+    
+    const searchTerm = clienteInputValue.toLowerCase();
+    const fullName = `${c.nombre} ${c.apellido}`.toLowerCase();
+    const phone = c.telefono?.toLowerCase() || "";
+    
+    return fullName.includes(searchTerm) || 
+           phone.includes(searchTerm) ||
+           c.nombre.toLowerCase().includes(searchTerm) ||
+           (c.apellido && c.apellido.toLowerCase().includes(searchTerm));
+  });
+
+  // Mejorar filtro de tipos de crédito
+  const filteredTipos = tipos.filter(t => {
+    if (!tipoInputValue.trim()) return true;
+    
+    const searchTerm = tipoInputValue.toLowerCase();
+    return t.nombre.toLowerCase().includes(searchTerm) ||
+           t.descripcion.toLowerCase().includes(searchTerm);
+  });
+
   const handleChange = <K extends keyof CreateCreditInput>(k: K, v: CreateCreditInput[K]) => {
     setForm(p => ({ ...p, [k]: v } as CreateCreditInput));
   };
 
-  // Filtrar clientes según lo que escribe el usuario
-  const filteredClientes = clientes.filter(c => {
-    const fullName = `${c.nombre} ${c.apellido ?? ""}`.toLowerCase();
-    const searchTerm = clienteInputValue.toLowerCase();
-    return fullName.includes(searchTerm) || c.telefono?.includes(searchTerm);
-  });
-
   const handleClienteInputChange = (value: string) => {
     setClienteInputValue(value);
     setShowClienteSuggestions(value.length > 0);
-    // Limpiar selección si está escribiendo
+    
+    // Limpiar selección si está escribiendo algo diferente
     if (form.cliente_id) {
-      handleChange("cliente_id", "");
+      const currentCliente = clientes.find(c => String(c.id) === form.cliente_id);
+      if (currentCliente) {
+        const currentName = `${currentCliente.nombre} ${currentCliente.apellido}`.trim();
+        if (value !== currentName) {
+          handleChange("cliente_id", "");
+        }
+      }
     }
   };
 
   const selectCliente = (cliente: Client) => {
-    const fullName = `${cliente.nombre} ${cliente.apellido ?? ""}`.trim();
+    const fullName = `${cliente.nombre} ${cliente.apellido}`.trim();
     setClienteInputValue(fullName);
     handleChange("cliente_id", String(cliente.id));
     setShowClienteSuggestions(false);
   };
 
-  // Filtrar tipos de crédito según lo que escribe el usuario
-  const filteredTipos = tipos.filter(t => 
-    t.nombre.toLowerCase().includes(tipoInputValue.toLowerCase())
-  );
-
   const handleTipoInputChange = (value: string) => {
     setTipoInputValue(value);
-    handleChange("producto", value);
     setShowTipoSuggestions(value.length > 0);
+    
+    // Actualizar el producto en el form
+    handleChange("producto", value);
   };
 
   const selectTipo = (tipo: CreditType) => {
     setTipoInputValue(tipo.nombre);
     handleChange("producto", tipo.nombre);
     setShowTipoSuggestions(false);
+    
+    // Opcionalmente ajustar monto según los límites del tipo
+    if (form.monto < Number(tipo.monto_minimo)) {
+      handleChange("monto", Number(tipo.monto_minimo));
+    } else if (form.monto > Number(tipo.monto_maximo)) {
+      handleChange("monto", Number(tipo.monto_maximo));
+    }
   };
 
   const onSubmit = async (e: React.FormEvent) => {
@@ -97,9 +132,37 @@ const CrearCreditoPage: React.FC = () => {
     setError(null); 
     setSuccess(null);
     
-    if (!form.cliente_id || !form.producto || form.monto <= 0) { 
-      setError("Complete los campos obligatorios"); 
+    // Validaciones mejoradas
+    if (!form.cliente_id) { 
+      setError("Debe seleccionar un cliente"); 
       return; 
+    }
+    
+    if (!form.producto.trim()) { 
+      setError("Debe seleccionar un tipo de crédito"); 
+      return; 
+    }
+    
+    if (form.monto <= 0) { 
+      setError("El monto debe ser mayor a 0"); 
+      return; 
+    }
+    
+    // Validar límites del tipo de crédito si está seleccionado
+    const tipoSeleccionado = tipos.find(t => t.nombre === form.producto);
+    if (tipoSeleccionado) {
+      const minimo = Number(tipoSeleccionado.monto_minimo);
+      const maximo = Number(tipoSeleccionado.monto_maximo);
+      
+      if (form.monto < minimo) {
+        setError(`El monto debe ser mayor a ${minimo.toLocaleString()}`);
+        return;
+      }
+      
+      if (form.monto > maximo) {
+        setError(`El monto no puede superar ${maximo.toLocaleString()}`);
+        return;
+      }
     }
     
     setLoading(true);
@@ -107,8 +170,8 @@ const CrearCreditoPage: React.FC = () => {
       await createCredit(form);
       setSuccess("Crédito creado exitosamente");
       setTimeout(() => navigate("/app/creditos"), 1500);
-    } catch {
-      setError("Error al crear el crédito");
+    } catch (err) {
+      setError((err as Error).message);
     } finally {
       setLoading(false);
     }
@@ -154,6 +217,20 @@ const CrearCreditoPage: React.FC = () => {
                 disabled={loadingMeta}
               />
               
+              {/* Indicador de carga en cliente */}
+              {loadingMeta && (
+                <div style={{
+                  position: "absolute",
+                  right: "12px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  fontSize: "12px",
+                  color: "var(--text-muted)"
+                }}>
+                  ⏳
+                </div>
+              )}
+              
               {/* Sugerencias de clientes */}
               {showClienteSuggestions && filteredClientes.length > 0 && (
                 <div style={{
@@ -169,6 +246,14 @@ const CrearCreditoPage: React.FC = () => {
                   maxHeight: "200px",
                   overflowY: "auto"
                 }}>
+                  <div style={{ 
+                    padding: "8px 12px", 
+                    fontSize: "11px", 
+                    color: "var(--text-muted)", 
+                    borderBottom: "1px solid var(--border-light)" 
+                  }}>
+                    {filteredClientes.length} cliente{filteredClientes.length !== 1 ? 's' : ''} encontrado{filteredClientes.length !== 1 ? 's' : ''}
+                  </div>
                   {filteredClientes.map(cliente => (
                     <div
                       key={String(cliente.id)}
@@ -183,7 +268,7 @@ const CrearCreditoPage: React.FC = () => {
                       onMouseLeave={e => e.currentTarget.style.backgroundColor = "transparent"}
                     >
                       <div style={{ fontWeight: "500" }}>
-                        {cliente.nombre} {cliente.apellido ?? ""}
+                        {cliente.nombre} {cliente.apellido}
                       </div>
                       {cliente.telefono && (
                         <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "2px" }}>
@@ -195,8 +280,8 @@ const CrearCreditoPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Opción de crear nuevo cliente */}
-              {clienteInputValue && filteredClientes.length === 0 && (
+              {/* Mensaje cuando no hay clientes */}
+              {showClienteSuggestions && clienteInputValue && filteredClientes.length === 0 && (
                 <div style={{
                   position: "absolute",
                   top: "100%",
@@ -209,9 +294,22 @@ const CrearCreditoPage: React.FC = () => {
                   zIndex: 1000,
                   padding: "12px 16px"
                 }}>
-                  <div style={{ fontSize: "14px", color: "var(--text-muted)" }}>
-                    👤 No se encontró cliente. <br />
-                    <strong>Crear nuevo cliente: "{clienteInputValue}"</strong>
+                  <div style={{ fontSize: "14px", color: "var(--text-muted)", textAlign: "center" }}>
+                    👤 No se encontró cliente con "{clienteInputValue}" <br />
+                    <button 
+                      type="button"
+                      onClick={() => navigate("/app/clientes/crear", { state: { nombre: clienteInputValue } })}
+                      style={{ 
+                        marginTop: "8px",
+                        color: "var(--primary)",
+                        background: "none",
+                        border: "none",
+                        textDecoration: "underline",
+                        cursor: "pointer"
+                      }}
+                    >
+                      ➕ Crear nuevo cliente
+                    </button>
                   </div>
                 </div>
               )}
